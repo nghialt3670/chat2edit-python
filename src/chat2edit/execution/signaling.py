@@ -5,15 +5,14 @@ from chat2edit.constants import (
     EXECUTION_FEEDBACK_SIGNAL_KEY,
     EXECUTION_RESPONSE_SIGNAL_KEY,
 )
-from chat2edit.models.execution import ExecutionFeedback
-from chat2edit.models.messages import ContextMessage
+from chat2edit.models.execution import ExecutionFeedback, ExecutionResponse
 
 
 class SignalManager:
     _signals = threading.local()
 
     @classmethod
-    def signal_response(cls, response: ContextMessage):
+    def signal_response(cls, response: ExecutionResponse):
         setattr(SignalManager._signals, EXECUTION_RESPONSE_SIGNAL_KEY, response)
 
     @classmethod
@@ -21,7 +20,7 @@ class SignalManager:
         return cls.get_response() is not None
 
     @classmethod
-    def get_response(cls) -> Optional[ContextMessage]:
+    def get_response(cls) -> Optional[ExecutionResponse]:
         return getattr(cls._signals, EXECUTION_RESPONSE_SIGNAL_KEY, None)
 
     @classmethod
