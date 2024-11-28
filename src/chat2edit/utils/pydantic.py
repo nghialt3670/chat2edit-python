@@ -43,4 +43,4 @@ class SmartTypeAdapter(TypeAdapter):
             except Exception:
                 continue
 
-        return TypeAdapter(self.base_cls).validate_python(data)
+        return TypeAdapter(self.base_cls).validate_json(data)

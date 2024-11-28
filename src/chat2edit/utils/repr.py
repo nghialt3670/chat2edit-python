@@ -2,7 +2,7 @@ import inspect
 import re
 from dataclasses import asdict
 from textwrap import indent
-from typing import Any, Dict, List, Type
+from typing import Any, Callable, Dict, List, Type
 
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
@@ -10,6 +10,9 @@ from pydantic_core import PydanticUndefined
 
 def anno_repr(anno: Any) -> str:
     """Generate a cleaner representation for an annotation."""
+
+    if anno == Any:
+        return "Any"
 
     if hasattr(anno, "__origin__"):
         origin_repr = anno.__origin__.__name__.capitalize()
@@ -25,6 +28,16 @@ def anno_repr(anno: Any) -> str:
 
     else:
         return str(anno)
+
+
+def func_signature_repr(func: Callable) -> str:
+    signature = inspect.signature(func)
+    signature_repr = f"({', '.join(signature.parameters)})"
+
+    if signature.return_annotation:
+        signature_repr += f" -> {signature.return_annotation}"
+
+    return signature_repr
 
 
 def to_snake_case(text: str) -> str:

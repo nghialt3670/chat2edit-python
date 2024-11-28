@@ -1,5 +1,7 @@
+import inspect
 from collections import deque
-from typing import Any
+from types import ModuleType
+from typing import Any, Dict
 
 
 def obj_to_path(root, obj) -> str:
@@ -56,3 +58,22 @@ def path_to_obj(root: Any, path: str) -> Any:
                 raise ValueError(f"Invalid path: {part} in {path}")
 
     return current
+
+
+def load_module(module: ModuleType) -> Dict[str, Any]:
+    """
+    Load all variables, functions, classes, and other definitions from a given module into a dictionary.
+
+    Args:
+        module (ModuleType): The module to load.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing the names and values of all definitions in the module.
+    """
+    module_dict = {}
+
+    for name, obj in inspect.getmembers(module):
+        if not name.startswith("__") and not inspect.ismodule(obj):
+            module_dict[name] = obj
+
+    return module_dict
