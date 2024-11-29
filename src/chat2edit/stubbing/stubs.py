@@ -5,25 +5,27 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Any, Callable, Iterable, List, Optional, Tuple, Type, Union
 
-from pydantic import Field
-
 from chat2edit.internal.exceptions import InvalidArgException
 from chat2edit.utils.ast import get_ast_node, get_node_doc
 from chat2edit.utils.repr import anno_repr
 
+ImportNodeType = Union[ast.Import, ast.ImportFrom]
 
 @dataclass
 class ImportInfo:
     names: Tuple[str, Optional[str]]
     module: Optional[str] = field(default=None)
-    
+
     @classmethod
-    def from_node(cls, node: Union[ast.Import, ast.ImportFrom]) -> "ImportInfo":
+    def from_node(cls, node: ImportNodeType) -> "ImportInfo":
         if not isinstance(node, (ast.Import, ast.ImportFrom)):
-            raise InvalidArgException("node", Union[ast.Import, ast.ImportFrom], node)
-        
-        names = [(name.name, ast.unparse(name.asname) if name.asname else None) for name in node.names]
-        
+            raise InvalidArgException("node", ImportNodeType, node)
+
+        names = [
+            (name.name, ast.unparse(name.asname) if name.asname else None)
+            for name in node.names
+        ]
+
         if isinstance(node, ast.Import):
             return cls(names=names)
 
@@ -42,17 +44,17 @@ class ImportInfo:
         return f"{f'from {self.module} ' if self.module else ''}import {', '.join(map(lambda x: f'{x[0]} as {x[1]}' if x[1] else x[0], self.names))}"
 
 
+AssignNodeType = Union[ast.Assign, ast.AnnAssign]
+
+
 @dataclass
 class AssignInfo:
     targets: List[str]
     value: Optional[str] = field(default=None)
-    operator: Optional[str] = field(default=None)
     annotation: Optional[str] = field(default=None)
 
     @classmethod
-    def from_node(
-        cls, node: Union[ast.Assign, ast.AnnAssign, ast.AugAssign]
-    ) -> "AssignInfo":
+    def from_node(cls, node: AssignNodeType) -> "AssignInfo":
         if isinstance(node, ast.Assign):
             return cls(
                 targets=list(map(ast.unparse, node.targets)),
@@ -66,16 +68,7 @@ class AssignInfo:
                 annotation=ast.unparse(node.annotation),
             )
 
-        if isinstance(node, ast.AugAssign):
-            return cls(
-                targets=[ast.unparse(node.target)],
-                value=ast.unparse(node.value),
-                operator=ast.unparse(node.op),
-            )
-
-        raise InvalidArgException(
-            "node", Union[ast.Assign, ast.AnnAssign, ast.AugAssign], node
-        )
+        raise InvalidArgException("node", AssignNodeType, node)
 
     @classmethod
     def from_param(cls, param: inspect.Parameter) -> "AssignInfo":
@@ -94,13 +87,15 @@ class AssignInfo:
         )
 
     def __repr__(self) -> str:
+        value_repr = f" = {self.value}" if self.value else ""
+
         if self.annotation:
-            return f"{self.targets[0]}: {self.annotation}{f' = {self.value}' if self.value else ''}"
+            return f"{self.targets[0]}: {self.annotation}{value_repr}"
 
-        if self.operator:
-            return f"f{self.targets[0]} {self.operator} {self.value}"
+        return f"{' = '.join(self.targets)}{value_repr}"
 
-        return f"{' = '.join(self.targets)}{f' = {self.value}' if self.value else ''}"
+
+FunctionNodeType = Union[ast.FunctionDef, ast.AsyncFunctionDef]
 
 
 @dataclass
@@ -112,13 +107,9 @@ class FunctionStub:
     decorators: List[str] = field(default_factory=list)
 
     @classmethod
-    def from_node(
-        cls, node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
-    ) -> "FunctionStub":
+    def from_node(cls, node: FunctionNodeType) -> "FunctionStub":
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            raise InvalidArgException(
-                "node", Union[ast.FunctionDef, ast.AsyncFunctionDef], node
-            )
+            raise InvalidArgException("node", FunctionNodeType, node)
 
         signature = f"({ast.unparse(node.args)})"
 
@@ -153,6 +144,11 @@ class FunctionStub:
         return stub
 
 
+ClassChildNodeType = Union[
+    ast.Assign, ast.AnnAssign, ast.FunctionDef, ast.AsyncFunctionDef
+]
+
+
 class ClassStubBuilder(ast.NodeVisitor):
     def __init__(self) -> None:
         super().__init__()
@@ -169,35 +165,26 @@ class ClassStubBuilder(ast.NodeVisitor):
         self.visit(node)
         return self.stub
 
-    def visit_Assign(self, node: ast.Assign) -> Any:
-        if self._check_node(node):
+    def visit(self, node: ast.AST) -> Any:
+        if isinstance(node, ast.ClassDef):
+            return super().visit(node)
+
+        elif (
+            isinstance(node, ast.Assign)
+            and any(filter(self._check_name, map(ast.unparse, node.targets)))
+        ) or (
+            isinstance(node, ast.AnnAssign)
+            and self._check_name(ast.unparse(node.target))
+        ):
             self.stub.attributes.append(AssignInfo.from_node(node))
 
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> Any:
-        if self._check_node(node):
-            self.stub.attributes.append(AssignInfo.from_node(node))
-
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
-        if self._check_node(node):
+        elif isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ) and self._check_name(node.name):
             self.stub.methods.append(FunctionStub.from_node(node))
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
-        if self._check_node(node):
-            self.stub.methods.append(FunctionStub.from_node(node))
-
-    def _check_node(
-        self,
-        node: Union[ast.Assign, ast.AnnAssign, ast.FunctionDef, ast.AsyncFunctionDef],
-    ) -> bool:
-        is_excluded = lambda x: x in self.excludes or x.startswith("_")
-
-        if isinstance(node, ast.Assign):
-            return not any(filter(is_excluded, map(ast.unparse, node.targets)))
-
-        if isinstance(node, ast.AnnAssign):
-            return not is_excluded(ast.unparse(node.target))
-
-        return not is_excluded(node.name)
+    def _check_name(self, name: str) -> bool:
+        return not (name in self.excludes or name.startswith("_"))
 
 
 @dataclass
@@ -233,13 +220,27 @@ class ClassStub:
             stub += f"({', '.join(self.bases)})"
 
         stub += ":\n"
-        stub += textwrap.indent("\n".join(map(str, self.attributes)), "    ")
-        stub += "\n"
-        stub += textwrap.indent("\n".join(map(str, self.methods)), "    ")
 
-        return stub
-    
-    
+        if not self.attributes and not self.methods:
+            stub += "    pass"
+            return stub
+
+        if self.attributes:
+            stub += textwrap.indent("\n".join(map(str, self.attributes)), "    ")
+            stub += "\n"
+
+        if self.methods:
+            stub += textwrap.indent("\n".join(map(str, self.methods)), "    ")
+            stub += "\n"
+
+        return stub.strip()
+
+
+CodeChildNodeType = Union[
+    ast.Assign, ast.AnnAssign, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef
+]
+
+
 class CodeStubBuilder(ast.NodeVisitor):
     def __init__(self) -> None:
         super().__init__()
@@ -252,57 +253,48 @@ class CodeStubBuilder(ast.NodeVisitor):
         self.visit(node)
         return self.stub
 
-    def visit_Import(self, node: ast.Import) -> Any:
-        self.stub.blocks.append(ImportInfo.from_node(node))
+    def visit(self, node: ast.AST) -> Any:
+        if isinstance(node, ast.Module):
+            return super().visit(node)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
-        self.stub.blocks.append(ImportInfo.from_node(node))
-            
-    def visit_ClassDef(self, node: ast.ClassDef) -> Any:
-        if self._check_node(node):
+        if isinstance(node, ImportNodeType.__args__):
+            self.stub.blocks.append(ImportInfo.from_node(node))
+
+        elif isinstance(node, ast.ClassDef) and self._check_name(node.name):
             is_class_exclude = lambda x: "." in x and x.split(".")[0] == node.name
-            class_excludes = map(lambda x: x.split(".").pop(), filter(is_class_exclude, self.excludes))
+            class_excludes = map(
+                lambda x: x.split(".").pop(), filter(is_class_exclude, self.excludes)
+            )
             self.stub.blocks.append(ClassStub.from_node(node, class_excludes))
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
-        if self._check_node(node):
-            self.stub.methods.append(FunctionStub.from_node(node))
+        elif isinstance(node, FunctionNodeType.__args__) and self._check_name(
+            node.name
+        ):
+            self.stub.blocks.append(FunctionStub.from_node(node))
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
-        if self._check_node(node):
-            self.stub.methods.append(FunctionStub.from_node(node))
-            
-    def visit_Assign(self, node: ast.Assign) -> Any:
-        if self._check_node(node):
-            self.stub.blocks.append(AssignInfo.from_node(node))
-            
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> Any:
-        if self._check_node(node):
+        elif (
+            isinstance(node, ast.Assign)
+            and any(filter(self._check_name, map(ast.unparse, node.targets)))
+        ) or (
+            isinstance(node, ast.AnnAssign)
+            and self._check_name(ast.unparse(node.target))
+        ):
             self.stub.blocks.append(AssignInfo.from_node(node))
 
-    def _check_node(
-        self,
-        node: Union[ast.Assign, ast.AnnAssign, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef],
-    ) -> bool:
-        is_excluded = lambda x: x in self.excludes or x.startswith("_")
+    def _check_name(self, name: str) -> bool:
+        return not (name in self.excludes or name.startswith("_"))
 
-        if isinstance(node, ast.Assign):
-            return not any(filter(is_excluded, map(ast.unparse, node.targets)))
 
-        if isinstance(node, ast.AnnAssign):
-            return not is_excluded(ast.unparse(node.target))
-
-        return not is_excluded(node.name)
-
+CodeBlockType = Union[ImportInfo, ClassStub, FunctionStub, AssignInfo]
 
 @dataclass
 class CodeStub:
-    blocks: List[Union[ImportInfo, ClassStub, FunctionStub, AssignInfo]] = field(
-        default_factory=list
-    )
-    
+    blocks: List[CodeBlockType] = field(default_factory=list)
+
     @classmethod
-    def from_module(cls, module: ModuleType, excludes: Iterable[str] = []) -> "CodeStub":
+    def from_module(
+        cls, module: ModuleType, excludes: Iterable[str] = []
+    ) -> "CodeStub":
         source = inspect.getsource(module)
         root = ast.parse(source)
         return CodeStubBuilder().build(root, excludes)
@@ -310,17 +302,17 @@ class CodeStub:
     def __repr__(self) -> str:
         stub = ""
         prev = None
-        
+
         for block in self.blocks:
             if not prev:
                 stub += f"{block}\n"
                 prev = block
                 continue
-            
-            if type(prev) != type(block) or isinstance(block, (ClassStub, FunctionStub)):
+
+            if type(prev) != type(block) or isinstance(block, ClassStub):
                 stub += "\n"
 
             stub += f"{block}\n"
             prev = block
-            
+
         return stub
