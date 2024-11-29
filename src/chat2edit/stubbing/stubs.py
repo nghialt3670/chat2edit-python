@@ -11,6 +11,7 @@ from chat2edit.utils.repr import anno_repr
 
 ImportNodeType = Union[ast.Import, ast.ImportFrom]
 
+
 @dataclass
 class ImportInfo:
     names: Tuple[str, Optional[str]]
@@ -286,6 +287,7 @@ class CodeStubBuilder(ast.NodeVisitor):
 
 
 CodeBlockType = Union[ImportInfo, ClassStub, FunctionStub, AssignInfo]
+
 
 @dataclass
 class CodeStub:
