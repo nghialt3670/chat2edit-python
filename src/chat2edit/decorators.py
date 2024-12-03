@@ -1,8 +1,10 @@
 import inspect
 from functools import wraps
-from typing import Any, Callable, List, Type
+from typing import Any, Callable, Iterable, List, Type
 
-from chat2edit.constants import CLASS_INFO_EXCLUDES_KEY, PYDANTIC_MODEL_EXCLUDES
+from pydantic import ConfigDict, TypeAdapter
+
+from chat2edit.constants import CLASS_STUB_EXCLUDED_ATTRIBUTES_KEY
 from chat2edit.exceptions import FeedbackException
 from chat2edit.feedbacks import (
     InvalidArgumentFeedback,
@@ -10,8 +12,9 @@ from chat2edit.feedbacks import (
     UnassignedValueFeedback,
 )
 from chat2edit.models import Error
+from chat2edit.signaling import set_response
+from chat2edit.stubbing.decorators import *
 from chat2edit.utils.repr import anno_repr
-from chat2edit.utils.typing import validate_type
 
 
 def feedback_invalid_argument(func: Callable):
@@ -26,13 +29,18 @@ def feedback_invalid_argument(func: Callable):
             if param_anno is inspect.Signature.empty:
                 continue
 
-            if not validate_type(param_value, param_anno):
+            try:
+                config = ConfigDict(arbitrary_types_allowed=True)
+                adaptor = TypeAdapter(param_anno, config=config)
+                adaptor.validate_python(param_value)
+            except:
                 feedback = InvalidArgumentFeedback(
+                    func=func.__name__,
                     param=Parameter(
                         name=param_name,
                         anno=anno_repr(param_anno),
                         type=type(param_value).__name__,
-                    )
+                    ),
                 )
                 raise FeedbackException(feedback)
 
@@ -46,7 +54,9 @@ def feedback_invalid_argument(func: Callable):
         validate_args(*args, **kwargs)
         return await func(*args, **kwargs)
 
-    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    extend_excluded_decorators(ret_wrapper, ["feedback_invalid_argument"])
+    return ret_wrapper
 
 
 def feedback_unassigned_value(func: Callable):
@@ -58,7 +68,7 @@ def feedback_unassigned_value(func: Callable):
             feedback = UnassignedValueFeedback(
                 severity="error",
                 func=func.__name__,
-                rtype=anno_repr(func.__annotations__.get("return", None)),
+                anno=anno_repr(func.__annotations__.get("return", None)),
             )
             raise FeedbackException(feedback)
 
@@ -72,7 +82,9 @@ def feedback_unassigned_value(func: Callable):
         check_caller_frame()
         return await func(*args, **kwargs)
 
-    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    extend_excluded_decorators(ret_wrapper, ["feedback_unassigned_value"])
+    return ret_wrapper
 
 
 def feedback_unexpected_error(func: Callable):
@@ -96,15 +108,24 @@ def feedback_unexpected_error(func: Callable):
             error = Error.from_exception(e)
             raise FeedbackException(error)
 
-    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    extend_excluded_decorators(ret_wrapper, ["feedback_unexpected_error"])
+    return ret_wrapper
 
 
-def exclude(excludes: List[str]):
-    def decorator(cls: Type[Any]):
-        setattr(cls, CLASS_INFO_EXCLUDES_KEY, excludes)
-        return cls
+def response(func: Callable):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        set_response(response)
+        return response
 
-    return decorator
+    @wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        response = await func(*args, **kwargs)
+        set_response(response)
+        return response
 
-
-pydantic_exclude = exclude(PYDANTIC_MODEL_EXCLUDES)
+    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+    extend_excluded_decorators(ret_wrapper, ["response"])
+    return ret_wrapper

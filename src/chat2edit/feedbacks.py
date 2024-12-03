@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 from chat2edit.models import Error, Feedback, Message, Severity
@@ -12,10 +14,11 @@ class Parameter(BaseModel):
 class InvalidArgumentFeedback(Feedback):
     severity: Severity = Field(default="error")
     param: Parameter
+    func: str
 
 
-class FunctionMessageFeedback(Message, Feedback):
-    pass
+class FunctionMessageFeedback(Feedback):
+    message: Message
 
 
 class FileObjModifiedFeedback(Feedback):
@@ -25,12 +28,13 @@ class FileObjModifiedFeedback(Feedback):
 
 class UnassignedValueFeedback(Feedback):
     func: str
-    rtype: str
+    anno: str
 
 
 class UnexpectedErrorFeedback(Feedback):
     severity: Severity = Field(default="error")
     error: Error
+    func: Optional[str] = Field(default=None)
 
 
 class IncompleteCycleFeedback(Feedback):

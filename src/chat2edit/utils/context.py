@@ -1,10 +1,10 @@
 import inspect
+import sys
 from collections import deque
-from types import ModuleType
-from typing import Any, Dict
+from typing import Any
 
 
-def obj_to_path(root, obj) -> str:
+def obj_to_path(obj: Any, root: Any) -> str:
     visited = set()
     queue = deque([(root, "root")])
 
@@ -38,7 +38,7 @@ def obj_to_path(root, obj) -> str:
     return None
 
 
-def path_to_obj(root: Any, path: str) -> Any:
+def path_to_obj(path: str, root: Any) -> Any:
     current = root
     parts = path.split(".")
 
@@ -60,20 +60,24 @@ def path_to_obj(root: Any, path: str) -> Any:
     return current
 
 
-def load_module(module: ModuleType) -> Dict[str, Any]:
-    """
-    Load all variables, functions, classes, and other definitions from a given module into a dictionary.
+def is_external_package(obj: Any) -> bool:
+    if inspect.isclass(obj) or inspect.isfunction(obj):
+        module_name = obj.__module__
+    else:
+        try:
+            module_name = obj.__class__.__module__
+        except AttributeError:
+            module_name = type(obj).__module__
 
-    Args:
-        module (ModuleType): The module to load.
+    return not module_name.startswith(__name__.split(".")[0])
 
-    Returns:
-        Dict[str, Any]: A dictionary containing the names and values of all definitions in the module.
-    """
-    module_dict = {}
 
-    for name, obj in inspect.getmembers(module):
-        if not name.startswith("__") and not inspect.ismodule(obj):
-            module_dict[name] = obj
+def find_shortest_import_path(obj: Any) -> str:
+    candidates = []
 
-    return module_dict
+    for name, module in list(sys.modules.items()):
+        if module and getattr(module, obj.__name__, None) is obj:
+            candidates.append(name)
+
+    candidates = [c for c in candidates if not c.startswith("__")]
+    return min(candidates, key=len)

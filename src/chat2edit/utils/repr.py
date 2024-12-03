@@ -1,11 +1,5 @@
-import inspect
 import re
-from dataclasses import asdict
-from textwrap import indent
-from typing import Any, Callable, Dict, List, Type
-
-from pydantic.fields import FieldInfo
-from pydantic_core import PydanticUndefined
+from typing import Any
 
 
 def anno_repr(anno: Any) -> str:
@@ -30,104 +24,9 @@ def anno_repr(anno: Any) -> str:
         return str(anno)
 
 
-def func_signature_repr(func: Callable) -> str:
-    signature = inspect.signature(func)
-    signature_repr = f"({', '.join(signature.parameters)})"
-
-    if signature.return_annotation:
-        signature_repr += f" -> {signature.return_annotation}"
-
-    return signature_repr
-
-
 def to_snake_case(text: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", text).lower()
 
 
-def get_class_stub(
-    cls: Type[Any], excludes: List[str] = [], exclude_private: bool = True
-) -> str:
-    base_classes = [base.__name__ for base in cls.__bases__ if base is not object]
-    base_classes_repr = f"({', '.join(base_classes)})" if base_classes else ""
-
-    attr_name_to_signature = get_cls_attr_name_to_signature(cls)
-    method_name_to_stub = get_cls_method_name_to_stub(cls)
-
-    check_member_name = lambda x: not (
-        (exclude_private and x.startswith("_")) or x in excludes
-    )
-
-    attr_signatures = [
-        signature
-        for name, signature in attr_name_to_signature.items()
-        if check_member_name(name)
-    ]
-    method_stubs = [
-        stub for name, stub in method_name_to_stub.items() if check_member_name(name)
-    ]
-
-    stub = f"class {cls.__name__}{base_classes_repr}:\n"
-
-    if not attr_signatures and not method_stubs:
-        stub += "    pass\n"
-    else:
-        stub += indent("\n".join(attr_signatures + method_stubs), "    ")
-
-    return stub
-
-
-def get_function_stub(func: Any) -> str:
-    params_anno_dict = {k: v for k, v in func.__annotations__.items() if k != "return"}
-    params_anno_repr = ", ".join(
-        f"{k}: {anno_repr(v)}" for k, v in params_anno_dict.items()
-    )
-
-    return_anno = func.__annotations__.get("return", None)
-    return_anno_repr = f" -> {anno_repr(return_anno)}" if return_anno else ""
-
-    return f"def {func.__name__}({params_anno_repr}){return_anno_repr}: ..."
-
-
-def get_cls_attr_name_to_signature(cls: Type[Any]) -> Dict[str, str]:
-    annotations = getattr(cls, "__annotations__", {})
-    fields = getattr(cls, "__fields__", {})
-
-    name_to_signature = {}
-
-    for attr_name, attr_type in annotations.items():
-        attr_type_repr = anno_repr(attr_type)
-        attr_signature = None
-
-        field = fields.get(attr_name)
-
-        # Pydantic Field
-        if isinstance(field, FieldInfo):
-            field_args_dict = {}
-
-            if field.default is not PydanticUndefined:
-                field_args_dict["default"] = repr(field.default)
-
-            if field.default_factory is not None:
-                field_args_dict["default_factory"] = field.default_factory.__name__
-
-            for metadata in field.metadata:
-                for k, v in asdict(metadata).items():
-                    field_args_dict[k] = v
-
-            field_args_repr = ", ".join(f"{k}={v}" for k, v in field_args_dict.items())
-            field_repr = f"Field({field_args_repr})"
-
-            attr_signature = f"{attr_name}: {attr_type_repr} = {field_repr}"
-        else:
-            attr_signature = f"{attr_name}: {attr_type_repr}"
-
-        name_to_signature[attr_name] = attr_signature
-
-    return name_to_signature
-
-
-def get_cls_method_name_to_stub(cls: Type[Any]) -> Dict[str, str]:
-    return {
-        name: get_function_stub(method)
-        for name, method in inspect.getmembers(cls, predicate=inspect.isfunction)
-    }
+def create_obj_basename(obj: Any) -> str:
+    return to_snake_case(obj.__class__.__name__)

@@ -21,7 +21,8 @@ class SignalManager:
 
     @classmethod
     def clear(cls, key: str) -> None:
-        delattr(cls._signals, key)
+        if hasattr(cls._signals, key):
+            delattr(cls._signals, key)
 
 
 def set_signal(key: str, value: Any) -> None:

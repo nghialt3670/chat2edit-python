@@ -1,6 +1,6 @@
 import ast
 import inspect
-from typing import Any, Callable
+from typing import Any
 
 
 def get_ast_node(target: Any) -> ast.AST:

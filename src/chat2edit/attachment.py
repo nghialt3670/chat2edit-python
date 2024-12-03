@@ -14,15 +14,19 @@ class Attachment(Generic[T]):
         basename: Optional[str] = None,
         original: bool = True,
         attrpaths: List[str] = [],
-        queryobjs: List["Attachment"] = [],
+        attachments: List[Any] = [],
     ) -> None:
         super().__init__()
+
+        while isinstance(obj, Attachment):
+            obj = obj.__obj__
+
         self.__dict__["__obj__"] = obj
         self.__dict__["__filename__"] = filename
         self.__dict__["__basename__"] = basename
         self.__dict__["__original__"] = original
         self.__dict__["__attrpaths__"] = attrpaths
-        self.__dict__["__queryobjs__"] = queryobjs
+        self.__dict__["__attachments__"] = attachments
 
     @property
     def __obj__(self) -> T:
@@ -45,8 +49,8 @@ class Attachment(Generic[T]):
         return self.__dict__["__attrpaths__"]
 
     @property
-    def __queryobjs__(self) -> List["Attachment"]:
-        return self.__dict__["__queryobjs__"]
+    def __attachments__(self) -> List["Attachment"]:
+        return self.__dict__["__attachments__"]
 
     @property
     def __class__(self) -> Type[T]:
