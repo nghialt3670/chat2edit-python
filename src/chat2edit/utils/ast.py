@@ -1,10 +1,11 @@
 import ast
 import inspect
+import textwrap
 from typing import Any
 
 
 def get_ast_node(target: Any) -> ast.AST:
-    root = ast.walk(ast.parse(inspect.getsource(target)))
+    root = ast.walk(ast.parse(textwrap.dedent(inspect.getsource(target))))
     next(root)
     return next(root)
 

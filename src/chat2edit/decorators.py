@@ -1,10 +1,9 @@
 import inspect
 from functools import wraps
-from typing import Any, Callable, Iterable, List, Type
+from typing import Callable
 
 from pydantic import ConfigDict, TypeAdapter
 
-from chat2edit.constants import CLASS_STUB_EXCLUDED_ATTRIBUTES_KEY
 from chat2edit.exceptions import FeedbackException
 from chat2edit.feedbacks import (
     InvalidArgumentFeedback,
@@ -14,6 +13,7 @@ from chat2edit.feedbacks import (
 from chat2edit.models import Error
 from chat2edit.signaling import set_response
 from chat2edit.stubbing.decorators import *
+from chat2edit.stubbing.decorators import _extend_excluded_decorators
 from chat2edit.utils.repr import anno_repr
 
 
@@ -55,7 +55,7 @@ def feedback_invalid_argument(func: Callable):
         return await func(*args, **kwargs)
 
     ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    extend_excluded_decorators(ret_wrapper, ["feedback_invalid_argument"])
+    _extend_excluded_decorators(ret_wrapper, ["feedback_invalid_argument"])
     return ret_wrapper
 
 
@@ -83,7 +83,7 @@ def feedback_unassigned_value(func: Callable):
         return await func(*args, **kwargs)
 
     ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    extend_excluded_decorators(ret_wrapper, ["feedback_unassigned_value"])
+    _extend_excluded_decorators(ret_wrapper, ["feedback_unassigned_value"])
     return ret_wrapper
 
 
@@ -109,11 +109,11 @@ def feedback_unexpected_error(func: Callable):
             raise FeedbackException(error)
 
     ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    extend_excluded_decorators(ret_wrapper, ["feedback_unexpected_error"])
+    _extend_excluded_decorators(ret_wrapper, ["feedback_unexpected_error"])
     return ret_wrapper
 
 
-def response(func: Callable):
+def respond(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
         response = func(*args, **kwargs)
@@ -127,5 +127,5 @@ def response(func: Callable):
         return response
 
     ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    extend_excluded_decorators(ret_wrapper, ["response"])
+    _extend_excluded_decorators(ret_wrapper, ["respond"])
     return ret_wrapper

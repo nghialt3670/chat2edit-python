@@ -1,6 +1,5 @@
 import ast
-import keyword
-from typing import Dict, List, Set
+from typing import List, Set
 
 import astor
 import black
@@ -51,46 +50,5 @@ def fix_unawaited_async_calls(code: str, async_func_names: List[str]) -> str:
     ast.fix_missing_locations(fixed_tree)
     fixed_code = astor.to_source(fixed_tree)
     formatted_code = black.format_str(fixed_code, mode=black.Mode(line_length=1000))
-
-    return formatted_code
-
-
-class NameTransformer(ast.NodeTransformer):
-    def __init__(self, mappings: Dict[str, str]):
-        self.mappings = mappings
-
-    def visit_Name(self, node: ast.Name):
-        if (
-            not keyword.iskeyword(node.id) and node.id not in {"self", "cls"}
-        ) and node.id in self.mappings:
-            node.id = self.mappings[node.id]
-
-        return node
-
-    def visit_FunctionDef(self, node: ast.FunctionDef):
-        if node.name in self.mappings:
-            node.name = self.mappings[node.name]
-
-        self.generic_visit(node)
-        return node
-
-    def visit_ClassDef(self, node: ast.ClassDef):
-        if node.name in self.mappings:
-            node.name = self.mappings[node.name]
-
-        self.generic_visit(node)
-        return node
-
-
-def replace_names(code: str, mappings: Dict[str, str]) -> str:
-    tree = ast.parse(code)
-
-    transformer = NameTransformer(mappings)
-    transformed_tree = transformer.visit(tree)
-
-    transformed_code = astor.to_source(transformed_tree)
-    formatted_code = black.format_str(
-        transformed_code, mode=black.Mode(line_length=1000)
-    )
 
     return formatted_code

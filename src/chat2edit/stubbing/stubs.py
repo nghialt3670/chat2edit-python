@@ -18,17 +18,21 @@ from typing import (
 )
 
 from chat2edit.constants import (
+    CLASS_ALIAS_KEY,
     CLASS_STUB_EXCLUDED_ATTRIBUTES_KEY,
     CLASS_STUB_EXCLUDED_BASES_KEY,
     CLASS_STUB_EXCLUDED_METHODS_KEY,
+    CLASS_STUB_MEMBER_ALIASES_KEY,
+    FUNCTION_ALIAS_KEY,
+    FUNCTION_STUB_PARAMETER_ALIASES_KEY,
     STUB_EXCLUDED_DECORATORS_KEY,
 )
 from chat2edit.internal.exceptions import (
     InvalidArgumentException,
     InvalidContextVariableException,
 )
+from chat2edit.stubbing.replacers import MemberReplacer, NameReplacer, ParameterReplacer
 from chat2edit.utils.ast import get_ast_node, get_node_doc
-from chat2edit.utils.code import replace_names
 from chat2edit.utils.context import find_shortest_import_path, is_external_package
 from chat2edit.utils.repr import anno_repr
 
@@ -158,16 +162,16 @@ class FunctionStub:
         stub.func = func
         return stub
 
-    def generate(self, excluded_decorators: Iterable[str] = []) -> str:
+    def generate(self) -> str:
         stub = ""
 
         excluded_decorators = set(
-            chain(
-                excluded_decorators,
-                getattr(self.func, STUB_EXCLUDED_DECORATORS_KEY, []),
-            )
+            getattr(self.func, STUB_EXCLUDED_DECORATORS_KEY, []),
         )
-        is_included_decorator = lambda x: x not in excluded_decorators
+        get_decorator_name = lambda x: x.split("(")[0]
+        is_included_decorator = (
+            lambda x: get_decorator_name(x) not in excluded_decorators
+        )
         included_decorators = list(filter(is_included_decorator, self.decorators))
 
         if included_decorators:
@@ -177,7 +181,11 @@ class FunctionStub:
         if self.coroutine:
             stub += "async "
 
-        stub += f"def {self.name}{self.signature}: ..."
+        name = getattr(self.func, FUNCTION_ALIAS_KEY, self.name)
+        stub += f"def {name}{self.signature}: ..."
+
+        param_aliases = getattr(self.func, FUNCTION_STUB_PARAMETER_ALIASES_KEY, None)
+        stub = ParameterReplacer.replace(stub, param_aliases) if param_aliases else stub
 
         return stub
 
@@ -208,30 +216,23 @@ class ClassStub:
     def from_class(cls, clss: Type[Any]) -> "ClassStub":
         node = get_ast_node(clss)
         stub = cls.from_node(node)
+
+        for i, method in enumerate(stub.methods):
+            stub.methods[i] = FunctionStub.from_func(getattr(clss, method.name))
+
         stub.clss = clss
         return stub
 
     def generate(
         self,
         *,
-        excluded_decorators: Iterable[str] = [],
-        excluded_bases: Iterable[str] = [],
         excluded_attributes: Iterable[str] = [],
         excluded_methods: Iterable[str] = [],
-        exclude_private_decorators: bool = True,
-        exclude_private_bases: bool = True,
-        exclude_private_attributes: bool = True,
-        exclude_private_methods: bool = True,
         indent_spaces: int = 4,
     ) -> str:
-        excluded_bases = set(
-            chain(excluded_bases, getattr(self.clss, CLASS_STUB_EXCLUDED_BASES_KEY, []))
-        )
+        excluded_bases = set(getattr(self.clss, CLASS_STUB_EXCLUDED_BASES_KEY, []))
         excluded_decorators = set(
-            chain(
-                excluded_decorators,
-                getattr(self.clss, STUB_EXCLUDED_DECORATORS_KEY, []),
-            )
+            getattr(self.clss, STUB_EXCLUDED_DECORATORS_KEY, []),
         )
         excluded_attributes = set(
             chain(
@@ -246,25 +247,19 @@ class ClassStub:
             )
         )
 
-        is_private = lambda x: x.startswith("_")
         get_decorator_name = lambda x: x.split("(")[0]
-
-        is_included_decorator = lambda x: get_decorator_name(
-            x
-        ) not in excluded_decorators and not (
-            exclude_private_decorators and is_private(get_decorator_name(x))
+        is_included_decorator = (
+            lambda x: get_decorator_name(x) not in excluded_decorators
         )
-        is_included_base = lambda x: x not in excluded_bases and not (
-            exclude_private_bases and is_private(x)
-        )
+        is_included_base = lambda x: x not in excluded_bases
         is_included_attribute = lambda x: all(
             map(lambda i: i not in excluded_attributes, x.targets)
-        ) and not (exclude_private_attributes and any(map(is_private, x.targets)))
-        is_included_method = lambda x: x.name not in excluded_methods and not (
-            exclude_private_methods and is_private(x.name)
+        )
+        is_included_method = (
+            lambda x: x.name not in excluded_methods and not x.startswith("_")
         )
 
-        included_decorators = filter(is_included_decorator, self.decorators)
+        included_decorators = list(filter(is_included_decorator, self.decorators))
         included_bases = list(filter(is_included_base, self.bases))
         included_atttributes = list(filter(is_included_attribute, self.attributes))
         included_methods = list(filter(is_included_method, self.methods))
@@ -275,7 +270,7 @@ class ClassStub:
         for dec in included_decorators:
             stub += f"@{dec}\n"
 
-        stub += f"class {self.name}"
+        stub += f"class {getattr(self.clss, CLASS_ALIAS_KEY, self.name)}"
 
         if included_bases:
             stub += f"({', '.join(included_bases)})"
@@ -295,6 +290,9 @@ class ClassStub:
                 "\n".join(method.generate() for method in included_methods), indent
             )
             stub += "\n"
+
+        member_aliases = getattr(self.clss, CLASS_STUB_MEMBER_ALIASES_KEY, None)
+        stub = MemberReplacer.replace(stub, member_aliases) if member_aliases else stub
 
         return stub.strip()
 
@@ -365,28 +363,9 @@ class CodeStub:
             prev = block
 
         if self.mappings:
-            return replace_names(stub, self.mappings)
+            return NameReplacer.replace(stub, self.mappings)
 
         return stub
 
     def __repr__(self) -> str:
-        stub = ""
-        prev = None
-
-        for block in self.blocks:
-            if not prev:
-                if isinstance(block, (ClassStub, FunctionStub)):
-                    stub += f"{block.generate()}\n"
-                else:
-                    stub += f"{block}\n"
-
-                prev = block
-                continue
-
-            if type(prev) != type(block) or isinstance(block, ClassStub):
-                stub += "\n"
-
-            stub += f"{block}\n"
-            prev = block
-
-        return stub
+        return self.generate()
