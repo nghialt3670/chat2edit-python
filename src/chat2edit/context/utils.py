@@ -1,23 +1,22 @@
-import inspect
-import sys
+import re
 from collections import deque
 from typing import Any
 
 
-def obj_to_path(obj: Any, root: Any) -> str:
+def value_to_path(value: Any, root: Any) -> str:
     visited = set()
     queue = deque([(root, "root")])
 
     while queue:
         current, path = queue.popleft()
-        obj_id = id(current)
+        value_id = id(current)
 
-        if obj_id in visited:
+        if value_id in visited:
             continue
 
-        visited.add(obj_id)
+        visited.add(value_id)
 
-        if current is obj:
+        if current is value:
             return path if path != "root" else "root"
 
         if isinstance(current, dict):
@@ -38,7 +37,7 @@ def obj_to_path(obj: Any, root: Any) -> str:
     return None
 
 
-def path_to_obj(path: str, root: Any) -> Any:
+def path_to_value(path: str, root: Any) -> Any:
     current = root
     parts = path.split(".")
 
@@ -60,24 +59,5 @@ def path_to_obj(path: str, root: Any) -> Any:
     return current
 
 
-def is_external_package(obj: Any) -> bool:
-    if inspect.isclass(obj) or inspect.isfunction(obj):
-        module_name = obj.__module__
-    else:
-        try:
-            module_name = obj.__class__.__module__
-        except AttributeError:
-            module_name = type(obj).__module__
-
-    return not module_name.startswith(__name__.split(".")[0])
-
-
-def find_shortest_import_path(obj: Any) -> str:
-    candidates = []
-
-    for name, module in list(sys.modules.items()):
-        if module and getattr(module, obj.__name__, None) is obj:
-            candidates.append(name)
-
-    candidates = [c for c in candidates if not c.startswith("__")]
-    return min(candidates, key=len)
+def to_snake_case(text: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", text).lower()

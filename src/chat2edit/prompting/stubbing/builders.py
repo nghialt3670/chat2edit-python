@@ -1,7 +1,7 @@
 import ast
 from typing import Any, get_args
 
-from chat2edit.stubbing.stubs import (
+from chat2edit.prompting.stubbing.stubs import (
     AssignInfo,
     AssignNodeType,
     ClassStub,

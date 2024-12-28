@@ -1,251 +1,135 @@
-import ast
-import inspect
-import io
-from contextlib import redirect_stdout
 from copy import deepcopy
-from itertools import zip_longest
-from typing import Any, Dict, List, Optional, Set
-from uuid import uuid4
+from typing import Callable, List, Optional
 
-from IPython.core.interactiveshell import InteractiveShell
 from pydantic import BaseModel, Field
 
-from chat2edit.attachment import Attachment
 from chat2edit.base import ContextProvider, Llm, PromptStrategy
 from chat2edit.constants import (
-    MAX_CYCLES_PER_PHASE_RANGE,
-    MAX_PHASE_PER_PROMPT_RANGE,
-    MAX_PROMPTS_PER_CYCLE_RANGE,
-    MAX_VARNAME_SEARCH_INDEX,
+    MAX_CYCLES_PER_PROMPT_RANGE,
+    MAX_LOOPS_PER_CYCLE_RANGE,
+    MAX_PROMPTS_PER_LOOP_RANGE,
 )
-from chat2edit.exceptions import FeedbackException
-from chat2edit.feedbacks import (
-    FunctionMessageFeedback,
-    IncompleteCycleFeedback,
-    UnexpectedErrorFeedback,
-)
-from chat2edit.models import AssignedAttachment, Cycle, Error, Message, Phase
-from chat2edit.signaling import (
-    clear_feedback,
-    clear_response,
-    get_feedback,
-    get_response,
-)
-from chat2edit.strategies import OtcStrategy
-from chat2edit.utils.code import fix_unawaited_async_calls
-from chat2edit.utils.context import path_to_obj
-from chat2edit.utils.repr import create_obj_basename
+from chat2edit.context.manage import assign
+from chat2edit.context.utils import value_to_path
+from chat2edit.execution.execute import execute
+from chat2edit.models import ChatCycle, Feedback, Message, PromptExecuteLoop
+from chat2edit.prompting.prompt import prompt
+from chat2edit.prompting.strategies.otc_strategy import OtcStrategy
 
 
 class Chat2EditConfig(BaseModel):
-    max_phase_per_prompt: int = Field(
+    max_cycles_per_prompt: int = Field(
         default=15,
-        ge=MAX_PHASE_PER_PROMPT_RANGE[0],
-        le=MAX_PHASE_PER_PROMPT_RANGE[1],
+        ge=MAX_CYCLES_PER_PROMPT_RANGE[0],
+        le=MAX_CYCLES_PER_PROMPT_RANGE[1],
     )
-    max_cycles_per_phase: int = Field(
+    max_loops_per_cycle: int = Field(
         default=4,
-        ge=MAX_CYCLES_PER_PHASE_RANGE[0],
-        le=MAX_CYCLES_PER_PHASE_RANGE[1],
+        ge=MAX_LOOPS_PER_CYCLE_RANGE[0],
+        le=MAX_LOOPS_PER_CYCLE_RANGE[1],
     )
-    max_prompts_per_cycle: int = Field(
+    max_prompts_per_loop: int = Field(
         default=2,
-        ge=MAX_PROMPTS_PER_CYCLE_RANGE[0],
-        le=MAX_PROMPTS_PER_CYCLE_RANGE[1],
+        ge=MAX_PROMPTS_PER_LOOP_RANGE[0],
+        le=MAX_PROMPTS_PER_LOOP_RANGE[1],
     )
+
+
+class Chat2EditCallbacks(BaseModel):
+    on_usr_request: Optional[Callable[[Message], None]] = Field(default=None)
+    on_block_execute: Optional[Callable[[str], None]] = Field(default=None)
+    on_sys_feedback: Optional[Callable[[Feedback], None]] = Field(default=None)
+    on_llm_respond: Optional[Callable[[Message], None]] = Field(default=None)
 
 
 class Chat2Edit:
     def __init__(
         self,
-        phases: List[Phase],
+        cycles: List[ChatCycle],
         *,
         llm: Llm,
         provider: ContextProvider,
         strategy: PromptStrategy = OtcStrategy(),
         config: Chat2EditConfig = Chat2EditConfig(),
-    ):
-        self._phases = phases
-        self._llm = llm
-        self._provider = provider
-        self._strategy = strategy
-        self._config = config
-
-    def get_phases(self) -> List[Phase]:
-        return self._phases
-
-    def get_success_phases(self) -> List[Phase]:
-        return list(filter(self._check_phase, self._phases))
+        callbacks: Chat2EditCallbacks = Chat2EditCallbacks(),
+    ) -> None:
+        self.cycles = cycles
+        self.llm = llm
+        self.provider = provider
+        self.strategy = strategy
+        self.config = config
+        self.callbacks = callbacks
 
     async def send(self, message: Message) -> Optional[Message]:
-        phase = Phase()
-        self._phases.append(phase)
+        cycle = ChatCycle(request=message)
+        self.cycles.append(cycle)
 
-        context = phase.context
-        provided_context = self._provider.get_context()
-        success_phases = self.get_success_phases()
+        provided_context = self.provider.get_context()
+        success_cycles = [cycle for cycle in self.cycles if cycle.response]
 
-        if success_phases and (prev_context := deepcopy(success_phases[-1].context)):
-            context.update(prev_context)
+        if success_cycles and (prev_context := deepcopy(success_cycles[-1].context)):
+            cycle.context.update(prev_context)
         else:
-            context.update(deepcopy(provided_context))
+            cycle.context.update(deepcopy(provided_context))
 
-        shell = InteractiveShell.instance()
-        context.update(shell.user_ns)
-        shell.user_ns = context
+        cycle.request.attachments = assign(cycle.request.attachments, cycle.context)
 
-        phases = success_phases[-self._config.max_phase_per_prompt - 1 :]
-        phases.append(phase)
+        if self.callbacks.on_usr_request:
+            self.callbacks.on_usr_request(cycle.request)
 
-        attached_message = self._attach_message(message)
-        trigger = self._assign_message(attached_message, context)
+        cycles = success_cycles[-self.config.max_cycles_per_prompt - 1 :]
+        cycles.append(cycle)
 
-        while len(phase.cycles) < self._config.max_cycles_per_phase:
-            cycle = Cycle(trigger=trigger)
-            phase.cycles.append(cycle)
+        while len(cycle.loops) < self.config.max_loops_per_cycle:
+            loop = PromptExecuteLoop()
+            cycle.loops.append(loop)
 
-            # Prompting
-            exemplars = self._provider.get_exemplars()
-            prompt = self._strategy.create_prompt(phases, provided_context, exemplars)
-            cycle.prompts.append(prompt)
+            prompting_result = await prompt(
+                cycles=cycles,
+                llm=self.llm,
+                provider=self.provider,
+                strategy=self.strategy,
+                max_prompts=self.config.max_prompts_per_loop,
+            )
 
-            while len(cycle.prompts) < self._config.max_prompts_per_cycle:
-                try:
-                    prompt = cycle.prompts[-1]
-                    messages = [
-                        msg
-                        for pair in zip_longest(cycle.prompts, cycle.answers)
-                        for msg in pair
-                        if msg is not None
-                    ]
-                    answer = await self._llm.generate(messages)
-                    cycle.answers.append(answer)
+            loop.prompts = prompting_result.prompts
+            loop.answers = prompting_result.answers
+            loop.error = prompting_result.error
 
-                except Exception as e:
-                    cycle.error = Error.from_exception(e)
-                    break
-
-                cycle.code = self._strategy.extract_code(cycle.answers[-1])
-
-                if cycle.code:
-                    break
-
-                refine_prompt = self._strategy.get_refine_prompt()
-                cycle.prompts.append(refine_prompt)
-
-            if not cycle.code:
+            if not prompting_result.code:
                 break
 
-            # Execution
-            try:
-                tree = ast.parse(cycle.code)
-            except Exception as e:
-                cycle.error = Error.from_exception(e)
-                break
+            execution_result = await execute(
+                code=prompting_result.code,
+                context=cycle.context,
+                on_block_execute=self.callbacks.on_block_execute,
+            )
 
-            async_func_names = [
-                k for k, v in context.items() if inspect.iscoroutinefunction(v)
-            ]
+            loop.blocks = execution_result.blocks
+            loop.feedback = execution_result.feedback
+            loop.error = execution_result.error
 
-            for node in tree.body:
-                block = ast.unparse(node)
+            if loop.feedback:
+                loop.feedback.attachments = [
+                    value_to_path(att, cycle.context)
+                    for att in loop.feedback.attachments
+                ]
 
-                fixed_block = fix_unawaited_async_calls(block, async_func_names)
-                cycle.blocks.append(fixed_block)
-
-                try:
-                    with io.StringIO() as buffer, redirect_stdout(buffer):
-                        cell_result = await shell.run_cell_async(
-                            fixed_block, silent=True
-                        )
-                        cell_result.raise_error()
-
-                except FeedbackException as e:
-                    cycle.result = e.feedback
-
-                    if isinstance(cycle.result, FunctionMessageFeedback):
-                        cycle.result.message = self._assign_message(
-                            self._attach_message(cycle.result.message), context
-                        )
-
-                    break
-
-                except Exception as e:
-                    error = Error.from_exception(e)
-                    cycle.result = UnexpectedErrorFeedback(error=error)
-                    break
-
-            if not cycle.result:
-                cycle.result = (
-                    get_response() or get_feedback() or IncompleteCycleFeedback()
+            if execution_result.response:
+                cycle.response = Message(
+                    text=execution_result.response.text,
+                    attachments=[
+                        value_to_path(att, cycle.context)
+                        for att in execution_result.response.attachments
+                    ],
                 )
 
-            clear_response()
-            clear_feedback()
+                if self.callbacks.on_llm_respond:
+                    self.callbacks.on_llm_respond(cycle.response)
 
-            if isinstance(cycle.result, Message):
-                return self._create_message(cycle.result, context)
+                return execution_result.response
 
-            trigger = cycle.result
+            if self.callbacks.on_sys_feedback:
+                self.callbacks.on_feedback(loop.feedback)
 
         return None
-
-    def _check_phase(self, phase: Phase) -> bool:
-        return phase.cycles and isinstance(phase.cycles[-1].result, Message)
-
-    def _attach_message(self, message: Message) -> Message:
-        return Message(
-            text=message.text,
-            attachments=[self._provider.attach(att) for att in message.attachments],
-        )
-
-    def _assign_message(self, message: Message, context: Dict[str, Any]) -> Message:
-        return Message(
-            text=message.text,
-            attachments=[
-                self._assign_attachment(att, context) for att in message.attachments
-            ],
-        )
-
-    def _create_message(self, message: Message, context: Dict[str, Any]) -> Message:
-        return Message(
-            text=message.text,
-            attachments=[path_to_obj(att.path, context) for att in message.attachments],
-        )
-
-    def _assign_attachment(
-        self,
-        attachment: Attachment,
-        context: Dict[str, Any],
-        existing_varnames: Optional[Set[str]] = None,
-    ) -> AssignedAttachment:
-        if not existing_varnames:
-            existing_varnames = set(context.keys())
-
-        basename = attachment.__basename__ or create_obj_basename(attachment)
-        varname = self._find_suitable_varname(basename, existing_varnames)
-
-        existing_varnames.add(varname)
-        context[varname] = attachment
-
-        return AssignedAttachment(
-            type=attachment.__class__.__name__,
-            path=varname,
-            attrpaths=attachment.__attrpaths__,
-            attachments=[
-                self._assign_attachment(att, context, existing_varnames)
-                for att in attachment.__attachments__
-            ],
-        )
-
-    def _find_suitable_varname(self, basename: str, existing_varnames: Set[str]) -> str:
-        i = 0
-
-        while i < MAX_VARNAME_SEARCH_INDEX:
-            if (varname := f"{basename}_{i}") not in existing_varnames:
-                return varname
-
-            i += 1
-
-        i = str(uuid4()).split("_").pop()
-        return f"{basename}_{i}"

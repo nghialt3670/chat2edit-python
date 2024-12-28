@@ -1,21 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Type, Union
+from typing import Any, Dict, List
 
-from chat2edit.attachment import Attachment
-from chat2edit.models import Phase
+from chat2edit.models import ChatCycle
 
 
 class ContextProvider(ABC):
     @abstractmethod
-    def get_context(self) -> Dict[str, Union[Type, Callable]]:
+    def get_context(self) -> Dict[str, Any]:
         pass
 
     @abstractmethod
-    def get_exemplars(self) -> List[Phase]:
+    def get_exemplars(self) -> List[ChatCycle]:
         pass
-
-    def attach(self, obj: Any) -> Attachment:
-        return Attachment(obj)
 
 
 class Llm(ABC):
@@ -27,7 +23,10 @@ class Llm(ABC):
 class PromptStrategy(ABC):
     @abstractmethod
     def create_prompt(
-        self, phases: List[Phase], context: Dict[str, Any], exemplars: List[Phase]
+        self,
+        cycles: List[ChatCycle],
+        exemplars: List[ChatCycle],
+        context: Dict[str, Any],
     ) -> str:
         pass
 

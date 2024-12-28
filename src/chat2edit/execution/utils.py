@@ -1,16 +1,17 @@
 import ast
-from typing import List, Set
+import inspect
+from typing import Any, Dict
 
 import astor
 import black
 
-__all__ = ["fix_unawaited_async_calls"]
-
 
 class AsyncCallCorrector(ast.NodeTransformer):
-    def __init__(self, async_func_names: Set[str]):
+    def __init__(self, context: Dict[str, Any]):
         super().__init__()
-        self.async_func_names = async_func_names
+        self.async_func_names = set(
+            [k for k, v in context.items() if inspect.iscoroutinefunction(v)]
+        )
 
     def visit_Call(self, node: ast.Call):
         if isinstance(node.func, ast.Name):
@@ -21,30 +22,18 @@ class AsyncCallCorrector(ast.NodeTransformer):
 
         return self.generic_visit(node)
 
-    def visit_FunctionDef(self, node: ast.FunctionDef):
-        self.current_function_is_async = (
-            node.args.kwonlyargs is not None and isinstance(node, ast.AsyncFunctionDef)
-        )
-        self.generic_visit(node)
-        return node
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
-        self.current_function_is_async = True
-        self.generic_visit(node)
-        return node
-
 
 def add_parent_info(node: ast.AST):
     for child in ast.iter_child_nodes(node):
-        child.parent = node
+        setattr(child, "parent", node)
         add_parent_info(child)
 
 
-def fix_unawaited_async_calls(code: str, async_func_names: List[str]) -> str:
+def fix_unawaited_async_calls(code: str, context: Dict[str, Any]) -> str:
     tree = ast.parse(code)
     add_parent_info(tree)
 
-    transformer = AsyncCallCorrector(set(async_func_names))
+    transformer = AsyncCallCorrector(context)
     fixed_tree = transformer.visit(tree)
 
     ast.fix_missing_locations(fixed_tree)

@@ -22,11 +22,3 @@ def anno_repr(anno: Any) -> str:
 
     else:
         return str(anno)
-
-
-def to_snake_case(text: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", text).lower()
-
-
-def create_obj_basename(obj: Any) -> str:
-    return to_snake_case(obj.__class__.__name__)

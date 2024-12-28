@@ -1,6 +1,6 @@
 import inspect
 from copy import deepcopy
-from typing import Any, Callable, Generic, List, Optional, Type, TypeVar
+from typing import Any, Callable, Generic, Optional, Type, TypeVar
 
 T = TypeVar("T")
 
@@ -10,11 +10,9 @@ class Attachment(Generic[T]):
         self,
         obj: T,
         *,
-        filename: Optional[str] = None,
         basename: Optional[str] = None,
-        original: bool = True,
-        attrpaths: List[str] = [],
-        attachments: List[Any] = [],
+        filename: Optional[str] = None,
+        modifiable: bool = False,
     ) -> None:
         super().__init__()
 
@@ -22,11 +20,9 @@ class Attachment(Generic[T]):
             obj = obj.__obj__
 
         self.__dict__["__obj__"] = obj
-        self.__dict__["__filename__"] = filename
         self.__dict__["__basename__"] = basename
-        self.__dict__["__original__"] = original
-        self.__dict__["__attrpaths__"] = attrpaths
-        self.__dict__["__attachments__"] = attachments
+        self.__dict__["__filename__"] = filename
+        self.__dict__["__modifiable__"] = modifiable
 
     @property
     def __obj__(self) -> T:
@@ -41,16 +37,8 @@ class Attachment(Generic[T]):
         return self.__dict__["__basename__"]
 
     @property
-    def __original__(self) -> bool:
-        return self.__dict__["__original__"]
-
-    @property
-    def __attrpaths__(self) -> List[str]:
-        return self.__dict__["__attrpaths__"]
-
-    @property
-    def __attachments__(self) -> List["Attachment"]:
-        return self.__dict__["__attachments__"]
+    def __modifiable__(self) -> bool:
+        return self.__dict__["__modifiable__"]
 
     @property
     def __class__(self) -> Type[T]:
@@ -61,7 +49,7 @@ class Attachment(Generic[T]):
     ) -> None:
         self.__dict__["__origin_modification_handler__"] = handler
 
-    def _handle_origin_modification(self, member: str) -> None:
+    def _handle_modification(self, member: str) -> None:
         if handler := getattr(self, "__origin_modification_handler__", None):
             caller_frame = inspect.currentframe().f_back.f_back
             for k, v in caller_frame.f_locals.items():
@@ -70,8 +58,8 @@ class Attachment(Generic[T]):
                     break
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if self.__original__:
-            self._handle_origin_modification(name)
+        if not self.__modifiable__:
+            self._handle_modification(name)
 
         setattr(self.__obj__, name, value)
 
@@ -85,14 +73,14 @@ class Attachment(Generic[T]):
         return self.__obj__[key]
 
     def __setitem__(self, key: Any, value: Any) -> None:
-        if self.__original__:
-            self._handle_origin_modification(key)
+        if self.__modifiable__:
+            self._handle_modification(key)
 
         self.__obj__[key] = value
 
     def __delitem__(self, key: Any) -> None:
-        if self.__original__:
-            self._handle_origin_modification(key)
+        if not self.__modifiable__:
+            self._handle_modification(key)
 
         del self.__obj__[key]
 
@@ -111,7 +99,7 @@ class Attachment(Generic[T]):
     def __deepcopy__(self, memo: Any) -> "Attachment":
         return Attachment(
             deepcopy(self.__obj__, memo),
-            filename=self.__filename__,
             basename=self.__basename__,
-            original=False,
+            filename=self.__filename__,
+            modifiable=True,
         )

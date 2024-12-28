@@ -21,7 +21,7 @@ class CodeReplacer(ast.NodeTransformer):
         format_mode = black.Mode(line_length=1000, is_pyi=True)
         formatted_code = black.format_str(transformed_code, mode=format_mode)
 
-        return "\n".join(line for line in formatted_code.split("\n") if line.strip())
+        return formatted_code
 
 
 class NameReplacer(CodeReplacer):
@@ -54,7 +54,7 @@ class NameReplacer(CodeReplacer):
         return node
 
 
-class MemberReplacer(CodeReplacer):
+class AttributeReplacer(CodeReplacer):
     def visit_Assign(self, node: ast.Assign):
         for i, target in enumerate(node.targets):
             unparsed_target = ast.unparse(target)
@@ -69,22 +69,6 @@ class MemberReplacer(CodeReplacer):
 
         if unparsed_target in self.mappings:
             node.target = ast.parse(self.mappings[unparsed_target])
-
-        return node
-
-    def visit_FunctionDef(self, node: ast.FunctionDef):
-        node.name = self.mappings.get(node.name, node.name)
-
-        for arg in node.args.args:
-            arg.arg = self.mappings.get(arg.arg, arg.arg)
-
-        return node
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
-        node.name = self.mappings.get(node.name, node.name)
-
-        for arg in node.args.args:
-            arg.arg = self.mappings.get(arg.arg, arg.arg)
 
         return node
 

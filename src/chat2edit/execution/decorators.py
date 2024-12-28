@@ -4,20 +4,18 @@ from typing import Callable
 
 from pydantic import ConfigDict, TypeAdapter
 
-from chat2edit.exceptions import FeedbackException
-from chat2edit.feedbacks import (
-    InvalidArgumentFeedback,
-    Parameter,
-    UnassignedValueFeedback,
+from chat2edit.execution.exceptions import FeedbackException
+from chat2edit.execution.feedbacks import (
+    IgnoredReturnValueFeedback,
+    InvalidParameterTypeFeedback,
+    UnexpectedErrorFeedback,
 )
+from chat2edit.execution.signaling import set_response
 from chat2edit.models import Error
-from chat2edit.signaling import set_response
-from chat2edit.stubbing.decorators import *
-from chat2edit.stubbing.decorators import _extend_excluded_decorators
 from chat2edit.utils.repr import anno_repr
 
 
-def feedback_invalid_argument(func: Callable):
+def feedback_invalid_parameter_type(func: Callable):
     def validate_args(*args, **kwargs) -> None:
         signature = inspect.signature(func)
         bound_args = signature.bind(*args, **kwargs)
@@ -34,13 +32,11 @@ def feedback_invalid_argument(func: Callable):
                 adaptor = TypeAdapter(param_anno, config=config)
                 adaptor.validate_python(param_value)
             except:
-                feedback = InvalidArgumentFeedback(
-                    func=func.__name__,
-                    param=Parameter(
-                        name=param_name,
-                        anno=anno_repr(param_anno),
-                        type=type(param_value).__name__,
-                    ),
+                feedback = InvalidParameterTypeFeedback(
+                    function=func.__name__,
+                    parameter=param_name,
+                    expected_type=anno_repr(param_anno),
+                    provided_type=type(param_value).__name__,
                 )
                 raise FeedbackException(feedback)
 
@@ -54,21 +50,18 @@ def feedback_invalid_argument(func: Callable):
         validate_args(*args, **kwargs)
         return await func(*args, **kwargs)
 
-    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    _extend_excluded_decorators(ret_wrapper, ["feedback_invalid_argument"])
-    return ret_wrapper
+    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
 
 
-def feedback_unassigned_value(func: Callable):
+def feedback_ignored_return_value(func: Callable):
     def check_caller_frame() -> None:
         caller_frame = inspect.currentframe().f_back.f_back
         instructions = list(inspect.getframeinfo(caller_frame).code_context or [])
 
         if not any(" = " in line for line in instructions):
-            feedback = UnassignedValueFeedback(
-                severity="error",
-                func=func.__name__,
-                anno=anno_repr(func.__annotations__.get("return", None)),
+            feedback = IgnoredReturnValueFeedback(
+                function=func.__name__,
+                value_type=anno_repr(func.__annotations__.get("return", None)),
             )
             raise FeedbackException(feedback)
 
@@ -82,9 +75,7 @@ def feedback_unassigned_value(func: Callable):
         check_caller_frame()
         return await func(*args, **kwargs)
 
-    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    _extend_excluded_decorators(ret_wrapper, ["feedback_unassigned_value"])
-    return ret_wrapper
+    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
 
 
 def feedback_unexpected_error(func: Callable):
@@ -96,7 +87,8 @@ def feedback_unexpected_error(func: Callable):
             raise e
         except Exception as e:
             error = Error.from_exception(e)
-            raise FeedbackException(error)
+            feedback = UnexpectedErrorFeedback(function=func.__name__, error=error)
+            raise FeedbackException(feedback)
 
     @wraps(func)
     async def async_wrapper(*args, **kwargs):
@@ -106,11 +98,10 @@ def feedback_unexpected_error(func: Callable):
             raise e
         except Exception as e:
             error = Error.from_exception(e)
-            raise FeedbackException(error)
+            feedback = UnexpectedErrorFeedback(function=func.__name__, error=error)
+            raise FeedbackException(feedback)
 
-    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    _extend_excluded_decorators(ret_wrapper, ["feedback_unexpected_error"])
-    return ret_wrapper
+    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
 
 
 def respond(func: Callable):
@@ -126,6 +117,4 @@ def respond(func: Callable):
         set_response(response)
         return response
 
-    ret_wrapper = async_wrapper if inspect.iscoroutinefunction(func) else wrapper
-    _extend_excluded_decorators(ret_wrapper, ["respond"])
-    return ret_wrapper
+    return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
