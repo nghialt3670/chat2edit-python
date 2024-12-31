@@ -109,12 +109,10 @@ class OtcStrategy(PromptStrategy):
 
         attachments_repr = ", ".join(request.attachments)
         return f'user_message("{request.text}", attachments=[{attachments_repr}])'
-
-    def create_observation_from_feedback(self, feedback: Feedback) -> str:
-        text: str = ""
-
+    
+    def create_feedback_text(self, feedback: Feedback) -> str:
         if isinstance(feedback, InvalidParameterTypeFeedback):
-            text = INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
+            return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function,
                 parameter=feedback.parameter,
                 expected_type=feedback.expected_type,
@@ -122,28 +120,31 @@ class OtcStrategy(PromptStrategy):
             )
 
         elif isinstance(feedback, ModifiedAttachmentFeedback):
-            text = MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(
+            return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(
                 variable=feedback.variable
             )
 
         elif isinstance(feedback, IgnoredReturnValueFeedback):
-            text = IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
+            return IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function, value_type=feedback.value_type
             )
 
         elif isinstance(feedback, UnexpectedErrorFeedback):
             if feedback.function:
-                text = FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
+                return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
                     function=feedback.function
                 )
             else:
-                text = GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT
+                return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT
 
         elif isinstance(feedback, IncompleteCycleFeedback):
-            text = INCOMPLETE_CYCLE_FEEDBACK_TEXT
+            return INCOMPLETE_CYCLE_FEEDBACK_TEXT
 
         else:
             raise ValueError(f"Unknown feedback: {feedback}")
+
+    def create_observation_from_feedback(self, feedback: Feedback) -> str:
+        text = self.create_feedback_text(feedback)
 
         if not feedback.attachments:
             return f'system_{feedback.severity}("{text}")'
