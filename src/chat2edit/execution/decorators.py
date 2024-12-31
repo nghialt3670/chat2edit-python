@@ -14,6 +14,13 @@ from chat2edit.execution.signaling import set_response
 from chat2edit.models import Error
 from chat2edit.utils.repr import anno_repr
 
+EXECUTION_DECORATORS = {
+    "feedback_invalid_parameter_type",
+    "feedback_ignored_return_value",
+    "feedback_unexpected_error",
+    "respond",
+}
+
 
 def feedback_invalid_parameter_type(func: Callable):
     def validate_args(*args, **kwargs) -> None:

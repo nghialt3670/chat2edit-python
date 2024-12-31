@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
+from chat2edit.execution.decorators import EXECUTION_DECORATORS
 from chat2edit.prompting.stubbing.decorators import STUBBING_DECORATORS
 from chat2edit.prompting.stubbing.replacers import (
     AttributeReplacer,
@@ -151,7 +152,10 @@ class FunctionStub:
             if dec.startswith("parameter_aliases"):
                 param_mappings = eval(get_call_args(dec))
 
-        decorators = [dec for dec in decorators if dec not in STUBBING_DECORATORS]
+        internal_decorators = STUBBING_DECORATORS
+        internal_decorators.update(EXECUTION_DECORATORS)
+
+        decorators = [dec for dec in decorators if dec not in internal_decorators]
 
         stub = ""
 

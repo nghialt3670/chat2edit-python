@@ -109,7 +109,7 @@ class OtcStrategy(PromptStrategy):
 
         attachments_repr = ", ".join(request.attachments)
         return f'user_message("{request.text}", attachments=[{attachments_repr}])'
-    
+
     def create_feedback_text(self, feedback: Feedback) -> str:
         if isinstance(feedback, InvalidParameterTypeFeedback):
             return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
