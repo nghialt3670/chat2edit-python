@@ -25,7 +25,7 @@ class ExecutionResult:
 
 
 async def execute(
-    *, code: str, context: str, on_block_execute: Optional[Callable[[str], None]] = None
+    *, code: str, context: str, on_execute: Optional[Callable[[str], None]] = None
 ) -> ExecutionResult:
     shell = InteractiveShell.instance()
     context.update(shell.user_ns)
@@ -45,8 +45,8 @@ async def execute(
         fixed_block = fix_unawaited_async_calls(block, context)
         result.blocks.append(fixed_block)
 
-        if on_block_execute:
-            on_block_execute(fixed_block)
+        if on_execute:
+            on_execute(fixed_block)
 
         try:
             with io.StringIO() as buffer, redirect_stdout(buffer):

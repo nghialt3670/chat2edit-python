@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any, Dict, List, Set
 from uuid import uuid4
 
@@ -17,6 +18,18 @@ def assign(values: List[Any], context: Dict[str, Any]) -> List[str]:
         context[varname] = value
 
     return assigned_varnames
+
+
+def safe_deepcopy(context: Dict[str, Any]) -> Dict[str, Any]:
+    copied_context = {}
+
+    for k, v in context.items():
+        try:
+            copied_context[k] = deepcopy(v)
+        except:
+            copied_context[k] = v
+
+    return copied_context
 
 
 def _get_value_basename(value: Any) -> str:

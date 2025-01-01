@@ -9,7 +9,7 @@ from chat2edit.constants import (
     MAX_LOOPS_PER_CYCLE_RANGE,
     MAX_PROMPTS_PER_LOOP_RANGE,
 )
-from chat2edit.context.manage import assign
+from chat2edit.context.manage import assign, safe_deepcopy
 from chat2edit.context.utils import value_to_path
 from chat2edit.execution.execute import execute
 from chat2edit.models import ChatCycle, Feedback, Message, PromptExecuteLoop
@@ -36,10 +36,10 @@ class Chat2EditConfig(BaseModel):
 
 
 class Chat2EditCallbacks(BaseModel):
-    on_usr_request: Optional[Callable[[Message], None]] = Field(default=None)
-    on_block_execute: Optional[Callable[[str], None]] = Field(default=None)
-    on_sys_feedback: Optional[Callable[[Feedback], None]] = Field(default=None)
-    on_llm_respond: Optional[Callable[[Message], None]] = Field(default=None)
+    on_request: Optional[Callable[[Message], None]] = Field(default=None)
+    on_execute: Optional[Callable[[str], None]] = Field(default=None)
+    on_feedback: Optional[Callable[[Feedback], None]] = Field(default=None)
+    on_respond: Optional[Callable[[Message], None]] = Field(default=None)
 
 
 class Chat2Edit:
@@ -64,18 +64,21 @@ class Chat2Edit:
         cycle = ChatCycle(request=message)
         self.cycles.append(cycle)
 
-        provided_context = self.provider.get_context()
         success_cycles = [cycle for cycle in self.cycles if cycle.response]
 
-        if success_cycles and (prev_context := deepcopy(success_cycles[-1].context)):
-            cycle.context.update(prev_context)
-        else:
-            cycle.context.update(deepcopy(provided_context))
+        if success_cycles:
+            prev_context = success_cycles[-1].context
+
+            if prev_context:
+                cycle.context.update(safe_deepcopy(prev_context))
+
+        provided_context = self.provider.get_context()
+        cycle.context.update(safe_deepcopy(provided_context))
 
         cycle.request.attachments = assign(cycle.request.attachments, cycle.context)
 
-        if self.callbacks.on_usr_request:
-            self.callbacks.on_usr_request(cycle.request)
+        if self.callbacks.on_request:
+            self.callbacks.on_request(cycle.request)
 
         cycles = success_cycles[-self.config.max_cycles_per_prompt - 1 :]
         cycles.append(cycle)
@@ -102,7 +105,7 @@ class Chat2Edit:
             execution_result = await execute(
                 code=prompting_result.code,
                 context=cycle.context,
-                on_block_execute=self.callbacks.on_block_execute,
+                on_execute=self.callbacks.on_execute,
             )
 
             loop.blocks = execution_result.blocks
@@ -124,12 +127,12 @@ class Chat2Edit:
                     ],
                 )
 
-                if self.callbacks.on_llm_respond:
-                    self.callbacks.on_llm_respond(cycle.response)
+                if self.callbacks.on_respond:
+                    self.callbacks.on_respond(cycle.response)
 
                 return execution_result.response
 
-            if self.callbacks.on_sys_feedback:
+            if self.callbacks.on_feedback:
                 self.callbacks.on_feedback(loop.feedback)
 
         return None
