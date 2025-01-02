@@ -1,5 +1,4 @@
 import ast
-import keyword
 from typing import Dict
 
 import astor
@@ -24,36 +23,6 @@ class CodeReplacer(ast.NodeTransformer):
         return formatted_code
 
 
-class NameReplacer(CodeReplacer):
-    def visit_Name(self, node: ast.Name):
-        if not keyword.iskeyword(node.id) and node.id not in {"self", "cls"}:
-            node.id = self.mappings.get(node.id, node.id)
-
-        return node
-
-    def visit_ClassDef(self, node: ast.ClassDef):
-        node.name = self.mappings.get(node.name, node.name)
-
-        self.generic_visit(node)
-        return node
-
-    def visit_FunctionDef(self, node: ast.FunctionDef):
-        node.name = self.mappings.get(node.name, node.name)
-
-        for arg in node.args.args:
-            arg.arg = self.mappings.get(arg.arg, arg.arg)
-
-        return node
-
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
-        node.name = self.mappings.get(node.name, node.name)
-
-        for arg in node.args.args:
-            arg.arg = self.mappings.get(arg.arg, arg.arg)
-
-        return node
-
-
 class AttributeReplacer(CodeReplacer):
     def visit_Assign(self, node: ast.Assign):
         for i, target in enumerate(node.targets):
@@ -70,6 +39,16 @@ class AttributeReplacer(CodeReplacer):
         if unparsed_target in self.mappings:
             node.target = ast.parse(self.mappings[unparsed_target])
 
+        return node
+
+
+class MethodReplacer(CodeReplacer):
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        node.name = self.mappings.get(node.name, node.name)
+        return node
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+        node.name = self.mappings.get(node.name, node.name)
         return node
 
 

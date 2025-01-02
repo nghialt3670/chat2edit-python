@@ -3,7 +3,8 @@ import inspect
 import re
 import sys
 import textwrap
-from typing import Any
+from itertools import chain
+from typing import Any, Dict, Iterable
 
 
 def get_ast_node(target: Any) -> ast.AST:
@@ -48,3 +49,17 @@ def find_shortest_import_path(obj: Any) -> str:
 
     candidates = [c for c in candidates if not c.startswith("__")]
     return min(candidates, key=len)
+
+
+def extend_list_attr(target: Any, attr: str, values: Iterable[Any]) -> None:
+    setattr(target, attr, list(chain(getattr(target, attr, []), values)))
+
+
+def append_list_attr(target: Any, attr: str, value: Any) -> None:
+    extend_list_attr(target, attr, [value])
+
+
+def update_dict_attr(target: Any, attr: str, update: Dict) -> None:
+    d = getattr(target, attr, {})
+    d.update(update)
+    setattr(target, attr, d)

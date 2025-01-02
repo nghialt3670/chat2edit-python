@@ -5,17 +5,32 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
-from chat2edit.execution.decorators import EXECUTION_DECORATORS
-from chat2edit.prompting.stubbing.decorators import STUBBING_DECORATORS
+from chat2edit.prompting.stubbing.constants import (
+    ATTRIBUTE_MAP_FUNCTION_KEY,
+    ATTRIBUTE_TO_ALIAS_KEY,
+    BASE_TO_ALIAS_KEY,
+    COROUTINE_EXCLUDED_KEY,
+    DOCSTRING_EXCLUDED_KEY,
+    EXCLUDED_ATTRIBUTES_KEY,
+    EXCLUDED_BASES_KEY,
+    EXCLUDED_DECORATORS_KEY,
+    EXCLUDED_METHODS_KEY,
+    INCLUDED_ATTRIBUTES_KEY,
+    INCLUDED_BASES_KEY,
+    INCLUDED_DECORATORS_KEY,
+    INCLUDED_METHODS_KEY,
+    METHOD_MAP_FUNCTION_KEY,
+    METHOD_TO_ALIAS_KEY,
+    PARAMETER_TO_ALIAS_KEY,
+)
 from chat2edit.prompting.stubbing.replacers import (
     AttributeReplacer,
-    NameReplacer,
+    MethodReplacer,
     ParameterReplacer,
 )
 from chat2edit.prompting.stubbing.utils import (
     find_shortest_import_path,
     get_ast_node,
-    get_call_args,
     get_node_doc,
     is_external_package,
 )
@@ -102,6 +117,7 @@ class FunctionStub:
     coroutine: bool = field(default=False)
     docstring: Optional[str] = field(default=None)
     decorators: List[str] = field(default_factory=list)
+    function: Optional[Callable] = field(default=None)
 
     @classmethod
     def from_node(cls, node: FunctionNodeType) -> "FunctionStub":
@@ -121,41 +137,34 @@ class FunctionStub:
     @classmethod
     def from_function(cls, func: Callable) -> "FunctionStub":
         node = get_ast_node(func)
-        return cls.from_node(node)
+        stub = cls.from_node(node)
+        stub.function = func
+        return stub
 
     def generate(self) -> str:
-        name = self.name
+        dec_names = set(dec.split("(")[0] for dec in self.decorators)
+        docstring = (
+            False
+            if self.function and hasattr(self.function, DOCSTRING_EXCLUDED_KEY)
+            else self.docstring
+        )
+        coroutine = (
+            False
+            if self.function and hasattr(self.function, COROUTINE_EXCLUDED_KEY)
+            else self.coroutine
+        )
+        name = self.function.__name__ if self.function else self.name
         signature = self.signature
-        coroutine = self.coroutine
-        docstring = self.docstring
-        decorators = self.decorators
-        param_mappings = {}
 
-        for dec in self.decorators:
-            if dec.startswith("alias"):
-                name = eval(get_call_args(dec))
+        param_to_alias = getattr(self, PARAMETER_TO_ALIAS_KEY, None)
 
-            elif dec == "exclude_docstring":
-                docstring = None
+        if included_decs := getattr(self.function, INCLUDED_DECORATORS_KEY, None):
+            dec_names.intersection_update(included_decs)
 
-            elif dec == "exclude_coroutine":
-                coroutine = False
+        if excluded_decs := getattr(self.function, EXCLUDED_DECORATORS_KEY, None):
+            dec_names.difference_update(excluded_decs)
 
-            if dec.startswith("include_decorators"):
-                included_decorators = eval(get_call_args(dec))
-                decorators.intersection_update(included_decorators)
-
-            if dec.startswith("exclude_decorators"):
-                excluded_decorators = eval(get_call_args(dec))
-                decorators.difference_update(excluded_decorators)
-
-            if dec.startswith("parameter_aliases"):
-                param_mappings = eval(get_call_args(dec))
-
-        internal_decorators = STUBBING_DECORATORS
-        internal_decorators.update(EXECUTION_DECORATORS)
-
-        decorators = [dec for dec in decorators if dec not in internal_decorators]
+        decorators = filter(lambda x: x.split("(")[0] in dec_names, self.decorators)
 
         stub = ""
 
@@ -172,8 +181,8 @@ class FunctionStub:
 
         stub += f"def {name}{signature}: ..."
 
-        if param_mappings:
-            stub = ParameterReplacer.replace(stub, param_mappings)
+        if param_to_alias:
+            stub = ParameterReplacer.replace(stub, param_to_alias)
 
         return stub
 
@@ -189,6 +198,7 @@ class ClassStub:
     methods: List[FunctionStub] = field(default_factory=list)
     decorators: List[str] = field(default_factory=list)
     docstring: Optional[str] = field(default=None)
+    clss: Optional[Type] = field(default=None)
 
     @classmethod
     def from_node(cls, node: ast.ClassDef) -> "ClassStub":
@@ -200,97 +210,109 @@ class ClassStub:
     def from_class(cls, clss: Type[Any]) -> "ClassStub":
         node = get_ast_node(clss)
         stub = cls.from_node(node)
+
+        for i, method_stub in enumerate(stub.methods):
+            method = getattr(clss, method_stub.name)
+
+            if callable(method):
+                stub.methods[i] = FunctionStub.from_function(method)
+
+        stub.clss = clss
         return stub
 
     def generate(
         self,
-        included_attributes: List[str] = [],
-        excluded_attributes: List[str] = [],
+        included_attrs: List[str] = [],
+        excluded_attrs: List[str] = [],
         included_methods: List[str] = [],
         excluded_methods: List[str] = [],
         indent_spaces: int = 4,
     ) -> str:
-        name = self.name
-        docstring = self.docstring
-        decorators = set(self.decorators)
+        dec_names = set(dec.split("(")[0] for dec in self.decorators)
+        name = self.clss.__name__ if self.clss else self.name
         bases = set(self.bases)
-        attributes = set(attr.target for attr in self.attributes)
-        methods = set(method.name for method in self.methods)
-        attr_mappings = {}
-        base_mappings = {}
+        docstring = (
+            None
+            if self.clss and hasattr(self.clss, DOCSTRING_EXCLUDED_KEY)
+            else self.docstring
+        )
+        attr_names = set(attr.target for attr in self.attributes)
+        method_names = set(method.name for method in self.methods)
 
-        if included_attributes:
-            attributes.intersection_update(included_attributes)
+        attr_to_alias = getattr(self.clss, ATTRIBUTE_TO_ALIAS_KEY, None)
+        attr_map_func = getattr(self.clss, ATTRIBUTE_MAP_FUNCTION_KEY, None)
 
-        attributes.difference_update(excluded_attributes)
+        method_to_alias = getattr(self.clss, METHOD_TO_ALIAS_KEY, None)
+        method_map_func = getattr(self.clss, METHOD_MAP_FUNCTION_KEY, None)
+
+        base_to_alias = getattr(self.clss, BASE_TO_ALIAS_KEY, None)
+
+        if included_attrs:
+            attr_names.intersection_update(included_attrs)
+
+        if excluded_attrs:
+            attr_names.difference_update(excluded_attrs)
 
         if included_methods:
-            methods.intersection_update(included_methods)
+            method_names.intersection_update(included_methods)
 
-        methods.difference_update(excluded_methods)
+        if excluded_methods:
+            method_names.difference_update(excluded_methods)
 
-        for dec in self.decorators:
-            if dec.startswith("alias"):
-                name = eval(get_call_args(dec))
+        if included_decs := getattr(self.clss, INCLUDED_DECORATORS_KEY, None):
+            dec_names.intersection_update(included_decs)
 
-            if dec.startswith("base_aliases"):
-                base_mappings = eval(get_call_args(dec))
+        if excluded_decs := getattr(self.clss, EXCLUDED_DECORATORS_KEY, None):
+            dec_names.difference_update(excluded_decs)
 
-            if dec == "exclude_docstring":
-                docstring = None
+        if included_bases := getattr(self.clss, INCLUDED_BASES_KEY, None):
+            bases.intersection_update(included_bases)
 
-            if dec.startswith("include_decorators"):
-                included_decorators = eval(get_call_args(dec))
-                decorators.intersection_update(included_decorators)
+        if excluded_bases := getattr(self.clss, EXCLUDED_BASES_KEY, None):
+            bases.difference_update(excluded_bases)
 
-            if dec.startswith("exclude_decorators"):
-                excluded_decorators = eval(get_call_args(dec))
-                decorators.difference_update(excluded_decorators)
+        if included_attrs := getattr(self.clss, INCLUDED_ATTRIBUTES_KEY, None):
+            attr_names.intersection_update(included_attrs)
 
-            if dec.startswith("include_bases"):
-                included_bases = eval(get_call_args(dec))
-                bases.intersection_update(included_bases)
+        if excluded_attrs := getattr(self.clss, EXCLUDED_ATTRIBUTES_KEY, None):
+            attr_names.difference_update(excluded_attrs)
 
-            if dec.startswith("exclude_bases"):
-                excluded_bases = eval(get_call_args(dec))
-                bases.difference_update(excluded_bases)
+        if included_methods := getattr(self.clss, INCLUDED_METHODS_KEY, None):
+            method_names.intersection_update(included_methods)
 
-            if dec.startswith("include_attributes"):
-                included_attributes = eval(get_call_args(dec))
-                attributes.intersection_update(included_attributes)
+        if excluded_methods := getattr(self.clss, EXCLUDED_METHODS_KEY, None):
+            method_names.difference_update(excluded_methods)
 
-            if dec.startswith("exclude_attributes"):
-                excluded_attributes = eval(get_call_args(dec))
-                attributes.difference_update(excluded_attributes)
+        decorators = filter(lambda x: x.split("(")[0] in dec_names, self.decorators)
 
-            if dec.startswith("include_methods"):
-                included_methods = eval(get_call_args(dec))
-                methods.intersection_update(included_methods)
-
-            if dec.startswith("exclude_methods"):
-                excluded_methods = eval(get_call_args(dec))
-                methods.difference_update(excluded_methods)
-
-            if dec.startswith("attribute_aliases"):
-                attr_mappings = eval(get_call_args(dec))
-
-        bases = list(bases)
-        for i, base in enumerate(bases):
-            bases[i] = base_mappings.get(base, base)
+        if base_to_alias:
+            bases = list(bases)
+            for i, base in enumerate(bases):
+                bases[i] = base_to_alias.get(base, base)
 
         attributes = [
             attr
             for attr in self.attributes
-            if attr.target in attributes and not attr.target.startswith("_")
+            if attr.target in attr_names and not attr.target.startswith("_")
         ]
+
+        if attr_map_func:
+            for attr in attributes:
+                attr.target = attr_map_func(attr.target)
+
         methods = [
             method
             for method in self.methods
-            if method.name in methods and not method.name.startswith("_")
+            if method.name in method_names and not method.name.startswith("_")
         ]
-        decorators = filter(
-            lambda x: x.split("(")[0] not in STUBBING_DECORATORS, decorators
-        )
+
+        for method in methods:
+            # Prevent method from being decorated by @alias
+            if method.function:
+                method.function.__name__ = method.name
+
+            if method_map_func:
+                method.name = method_map_func(method.name)
 
         stub = ""
         indent = " " * indent_spaces
@@ -323,8 +345,11 @@ class ClassStub:
             stub += textwrap.indent("\n".join(map(str, methods)), indent)
             stub += "\n"
 
-        if attr_mappings:
-            stub = AttributeReplacer.replace(stub, attr_mappings)
+        if attr_to_alias:
+            stub = AttributeReplacer.replace(stub, attr_to_alias)
+
+        if method_to_alias:
+            stub = MethodReplacer.replace(stub, method_to_alias)
 
         return stub.strip()
 
@@ -368,12 +393,22 @@ class CodeStub:
 
             elif inspect.isclass(v):
                 stub = ClassStub.from_class(v)
-                mappings[stub.name] = k
+
+                if stub.name != k:
+                    mappings[stub.name] = k
+                elif stub.clss and stub.name != stub.clss.__name__:
+                    mappings[stub.name] = stub.clss.__name__
+
                 blocks.append(stub)
 
             elif inspect.isfunction(v):
                 stub = FunctionStub.from_function(v)
-                mappings[stub.name] = k
+
+                if stub.name != k:
+                    mappings[stub.name] = k
+                elif stub.function and stub.name != stub.function.__name__:
+                    mappings[stub.name] = stub.function.__name__
+
                 blocks.append(stub)
 
         return cls(mappings, blocks)
@@ -395,7 +430,8 @@ class CodeStub:
             prev = block
 
         if self.mappings:
-            stub = NameReplacer.replace(stub, self.mappings)
+            for k, v in self.mappings.items():
+                stub = stub.replace(k, v)
 
         return stub.strip()
 

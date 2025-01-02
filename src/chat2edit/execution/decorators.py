@@ -12,16 +12,11 @@ from chat2edit.execution.feedbacks import (
 )
 from chat2edit.execution.signaling import set_response
 from chat2edit.models import Error
+from chat2edit.prompting.stubbing.decorators import exclude_this_decorator
 from chat2edit.utils.repr import anno_repr
 
-EXECUTION_DECORATORS = {
-    "feedback_invalid_parameter_type",
-    "feedback_ignored_return_value",
-    "feedback_unexpected_error",
-    "respond",
-}
 
-
+@exclude_this_decorator
 def feedback_invalid_parameter_type(func: Callable):
     def validate_args(*args, **kwargs) -> None:
         signature = inspect.signature(func)
@@ -60,6 +55,7 @@ def feedback_invalid_parameter_type(func: Callable):
     return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
 
 
+@exclude_this_decorator
 def feedback_ignored_return_value(func: Callable):
     def check_caller_frame() -> None:
         caller_frame = inspect.currentframe().f_back.f_back
@@ -85,6 +81,7 @@ def feedback_ignored_return_value(func: Callable):
     return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
 
 
+@exclude_this_decorator
 def feedback_unexpected_error(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -111,6 +108,7 @@ def feedback_unexpected_error(func: Callable):
     return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
 
 
+@exclude_this_decorator
 def respond(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
