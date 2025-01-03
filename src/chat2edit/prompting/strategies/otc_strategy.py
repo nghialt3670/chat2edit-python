@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from chat2edit.base import PromptStrategy
 from chat2edit.execution.feedbacks import (
@@ -13,7 +13,8 @@ from chat2edit.execution.feedbacks import (
 from chat2edit.models import ChatCycle, Message
 from chat2edit.prompting.stubbing.stubs import CodeStub
 
-OTC_PROMPT_TEMPLATE = """Given this context code:
+OTC_PROMPT_TEMPLATE = """
+Given this context code:
 
 ```python
 {context_code}
@@ -25,15 +26,41 @@ Follow these exemplary observation-thinking-commands sequences:
 
 Give the next thinking and commands for the current sequences:
 
-{current_otc_sequences}"""
+{current_otc_sequences}
+""".strip()
 
-OTC_REFINE_PROMPT = """Please answer in this format:
+REQUEST_OBSERVATION_TEMPLATE = 'user_message("{text}")'
+REQUEST_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE = (
+    'user_message("{text}", attachments={attachments})'
+)
+
+FEEDBACK_OBSERVATION_TEMPLATE = 'system_{severity}("{text}")'
+FEEDBACK_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE = (
+    'system_{severity}("{text}", attachments={attachments})'
+)
+
+COMPLETE_OTC_SEQUENCE_TEMPLATE = """
+observation: {observation}
+thinking: {thinking}
+commands:
+```python
+{commands}
+```
+""".strip()
+
+INCOMPLETE_OTC_SEQUENCE_TEMPLATE = """
+observation: {observation}
+""".strip()
+
+OTC_REFINE_PROMPT = """
+Please answer in this format:
 
 thinking: <YOUR_THINKING>
 commands:
 ```python
 <YOUR_COMMANDS>
-```"""
+```
+""".strip()
 
 INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, argument for `{parameter}` must be of type `{expected_type}`, but received type `{received_type}`"
 MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE = "The variable `{variable}` holds an attachment, which cannot be modified directly. To make changes, create a copy of the object using `deepcopy` and modify the copy instead."
@@ -54,11 +81,10 @@ class OtcStrategy(PromptStrategy):
     ) -> str:
         context_code = self.create_context_code(context)
         exemplary_otc_sequences = "\n\n".join(
-            f"Exemplar {idx + 1}:\n{self.create_otc_sequence(cycle)}"
+            f"Exemplar {idx + 1}:\n{self.create_otc_sequences(cycle)}"
             for idx, cycle in enumerate(exemplars)
         )
-
-        current_otc_sequences = "\n".join(map(self.create_otc_sequence, cycles))
+        current_otc_sequences = "\n".join(map(self.create_otc_sequences, cycles))
 
         return OTC_PROMPT_TEMPLATE.format(
             context_code=context_code,
@@ -69,7 +95,7 @@ class OtcStrategy(PromptStrategy):
     def get_refine_prompt(self) -> str:
         return OTC_REFINE_PROMPT
 
-    def extract_code(self, text: str) -> Optional[str]:
+    def extract_code(self, text: str) -> str:
         _, code = self.extract_thinking_commands(text)
         return code
 
@@ -77,11 +103,9 @@ class OtcStrategy(PromptStrategy):
         code_stub = CodeStub.from_context(context)
         return code_stub.generate()
 
-    def create_otc_sequence(self, cycle: ChatCycle) -> str:
-        otc_sequence = ""
-
-        request_obs = self.create_observation_from_request(cycle.request)
-        otc_sequence += f"observation: {request_obs}\n"
+    def create_otc_sequences(self, cycle: ChatCycle) -> str:
+        sequences = []
+        observation = self.create_observation_from_request(cycle.request)
 
         for loop in cycle.loops:
             if not loop.answers:
@@ -90,21 +114,29 @@ class OtcStrategy(PromptStrategy):
             thinking, _ = self.extract_thinking_commands(loop.answers[-1])
             commands = "\n".join(loop.blocks)
 
-            otc_sequence += f"thinking: {thinking}\n"
-            otc_sequence += f"commands:\n```python\n{commands}\n```\n"
+            sequences.append(
+                COMPLETE_OTC_SEQUENCE_TEMPLATE.format(
+                    observation=observation, thinking=thinking, commands=commands
+                )
+            )
 
             if loop.feedback:
-                feedback_obs = self.create_observation_from_feedback(loop.feedback)
-                otc_sequence += f"observation: {feedback_obs}\n"
+                observation = self.create_observation_from_feedback(loop.feedback)
 
-        return otc_sequence
+        if not cycle.response:
+            sequences.append(
+                INCOMPLETE_OTC_SEQUENCE_TEMPLATE.format(observation=observation)
+            )
+
+        return "\n".join(sequences)
 
     def create_observation_from_request(self, request: Message) -> str:
         if not request.attachments:
-            return f'user_message("{request.text}")'
+            return REQUEST_OBSERVATION_TEMPLATE.format(text=request.text)
 
-        attachments_repr = ", ".join(request.attachments)
-        return f'user_message("{request.text}", attachments=[{attachments_repr}])'
+        return REQUEST_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE.format(
+            text=request.text, attachments=f'[{", ".join(request.attachments)}]'
+        )
 
     def create_feedback_text(self, feedback: Feedback) -> str:
         if isinstance(feedback, InvalidParameterTypeFeedback):
@@ -143,14 +175,17 @@ class OtcStrategy(PromptStrategy):
         text = self.create_feedback_text(feedback)
 
         if not feedback.attachments:
-            return f'system_{feedback.severity}("{text}")'
+            return FEEDBACK_OBSERVATION_TEMPLATE.format(
+                severity=feedback.severity, text=text
+            )
 
-        attachments_repr = ", ".join(feedback.attachments)
-        return f'system_{feedback.severity}("{text}", attachments=[{attachments_repr}])'
+        return FEEDBACK_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE.format(
+            severity=feedback.severity,
+            text=text,
+            attachments=f'[{", ".join(feedback.attachments)}]',
+        )
 
-    def extract_thinking_commands(
-        self, text: str
-    ) -> Tuple[Optional[str], Optional[str]]:
+    def extract_thinking_commands(self, text: str) -> Tuple[str, str]:
         parts = [
             part.strip()
             for part in text.replace("observation:", "$")
@@ -161,6 +196,8 @@ class OtcStrategy(PromptStrategy):
         ]
 
         thinking = parts[-2]
-        commands = re.search(r"```python(.*?)```", parts[-1], re.DOTALL).group(1).strip()
+        commands = (
+            re.search(r"```python(.*?)```", parts[-1], re.DOTALL).group(1).strip()
+        )
 
         return thinking, commands

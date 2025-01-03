@@ -1,5 +1,6 @@
-from copy import deepcopy
-from typing import Callable, List, Optional
+import ast
+import copy
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field
 
@@ -11,9 +12,14 @@ from chat2edit.constants import (
 )
 from chat2edit.context.manage import assign, safe_deepcopy
 from chat2edit.context.utils import value_to_path
-from chat2edit.execution.execute import execute
-from chat2edit.models import ChatCycle, Feedback, Message, PromptExecuteLoop
-from chat2edit.prompting.prompt import prompt
+from chat2edit.execution.code import execute_code, process_code
+from chat2edit.execution.exceptions import FeedbackException, ResponseException
+from chat2edit.execution.feedbacks import (
+    IncompleteCycleFeedback,
+    UnexpectedErrorFeedback,
+)
+from chat2edit.execution.signaling import pop_feedback, pop_response
+from chat2edit.models import ChatCycle, Error, Feedback, Message, PromptExecuteLoop
 from chat2edit.prompting.strategies.otc_strategy import OtcStrategy
 
 
@@ -37,6 +43,10 @@ class Chat2EditConfig(BaseModel):
 
 class Chat2EditCallbacks(BaseModel):
     on_request: Optional[Callable[[Message], None]] = Field(default=None)
+    on_prompt: Optional[Callable[[str], None]] = Field(default=None)
+    on_answer: Optional[Callable[[str], None]] = Field(default=None)
+    on_extract: Optional[Callable[[str], None]] = Field(default=None)
+    on_process: Optional[Callable[[str], None]] = Field(default=None)
     on_execute: Optional[Callable[[str], None]] = Field(default=None)
     on_feedback: Optional[Callable[[Feedback], None]] = Field(default=None)
     on_respond: Optional[Callable[[Message], None]] = Field(default=None)
@@ -62,8 +72,14 @@ class Chat2Edit:
 
     async def send(self, message: Message) -> Optional[Message]:
         cycle = ChatCycle(request=message)
-        self.cycles.append(cycle)
 
+        self.cycles.append(cycle)
+        self._contextualize(cycle.request, cycle.context, existed=False)
+
+        if self.callbacks.on_request:
+            self.callbacks.on_request(cycle.request)
+
+        cycle.context.update(safe_deepcopy(self.provider.get_context()))
         success_cycles = [cycle for cycle in self.cycles if cycle.response]
 
         if success_cycles:
@@ -72,67 +88,151 @@ class Chat2Edit:
             if prev_context:
                 cycle.context.update(safe_deepcopy(prev_context))
 
-        provided_context = self.provider.get_context()
-        cycle.context.update(safe_deepcopy(provided_context))
-
-        cycle.request.attachments = assign(cycle.request.attachments, cycle.context)
-
-        if self.callbacks.on_request:
-            self.callbacks.on_request(cycle.request)
-
-        cycles = success_cycles[-self.config.max_cycles_per_prompt - 1 :]
-        cycles.append(cycle)
+        curr_cycles = success_cycles[-self.config.max_cycles_per_prompt - 1 :]
+        curr_cycles.append(cycle)
 
         while len(cycle.loops) < self.config.max_loops_per_cycle:
             loop = PromptExecuteLoop()
             cycle.loops.append(loop)
 
-            prompting_result = await prompt(
-                cycles=cycles,
-                llm=self.llm,
-                provider=self.provider,
-                strategy=self.strategy,
-                max_prompts=self.config.max_prompts_per_loop,
+            loop.prompts, loop.answers, loop.error, code = await self._prompt(
+                curr_cycles
             )
 
-            loop.prompts = prompting_result.prompts
-            loop.answers = prompting_result.answers
-            loop.error = prompting_result.error
-
-            if not prompting_result.code:
+            if not code:
                 break
 
-            execution_result = await execute(
-                code=prompting_result.code,
-                context=cycle.context,
-                on_execute=self.callbacks.on_execute,
+            loop.blocks, loop.error, loop.feedback, response = await self._execute(
+                code, cycle.context
             )
 
-            loop.blocks = execution_result.blocks
-            loop.feedback = execution_result.feedback
-            loop.error = execution_result.error
-
             if loop.feedback:
-                loop.feedback.attachments = [
-                    value_to_path(att, cycle.context)
-                    for att in loop.feedback.attachments
-                ]
+                self._contextualize(loop.feedback, cycle.context, existed=False)
 
-            if execution_result.response:
-                cycle.response = Message(
-                    text=execution_result.response.text,
-                    attachments=[
-                        value_to_path(att, cycle.context)
-                        for att in execution_result.response.attachments
-                    ],
-                )
+            if response:
+                cycle.response = copy.copy(response)
+
+                self._contextualize(cycle.response, cycle.context, existed=True)
 
                 if self.callbacks.on_respond:
                     self.callbacks.on_respond(cycle.response)
 
-                return execution_result.response
+                return response
 
             if self.callbacks.on_feedback:
                 self.callbacks.on_feedback(loop.feedback)
 
         return None
+
+    def _contextualize(
+        self, target: Union[Message, Feedback], context: Dict[str, Any], existed: bool
+    ) -> None:
+        target.attachments = (
+            [value_to_path(att, context) for att in target.attachments]
+            if existed
+            else assign(target.attachments, context)
+        )
+
+    async def _prompt(
+        self,
+        cycles: List[ChatCycle],
+    ) -> Tuple[List[str], List[str], Optional[Error], Optional[str]]:
+        messages = []
+        prompts = []
+        answers = []
+        error = None
+        code = None
+
+        exemplars = self.provider.get_exemplars()
+        context = self.provider.get_context()
+
+        while len(prompts) < self.config.max_prompts_per_loop:
+            prompt = (
+                self.strategy.get_refine_prompt()
+                if prompts
+                else self.strategy.create_prompt(cycles, exemplars, context)
+            )
+
+            prompts.append(prompt)
+            messages.append(prompt)
+
+            if self.callbacks.on_prompt:
+                self.callbacks.on_prompt(prompt)
+
+            try:
+                answer = await self.llm.generate(messages)
+
+                answers.append(answer)
+                messages.append(answer)
+
+                if self.callbacks.on_answer:
+                    self.callbacks.on_answer
+
+            except Exception as e:
+                error = Error.from_exception(e)
+                break
+
+            try:
+                code = self.strategy.extract_code(answer)
+
+                if self.callbacks.on_extract:
+                    self.callbacks.on_extract(code)
+
+                break
+            except:
+                pass
+
+        return prompts, answers, error, code
+
+    async def _execute(
+        self, code: str, context: Dict[str, Any]
+    ) -> Tuple[List[str], Optional[Error], Optional[Feedback], Optional[Message]]:
+        blocks = []
+        error = None
+        feedback = None
+        response = None
+
+        processed_code = process_code(code, context)
+
+        if self.callbacks.on_process:
+            self.callbacks.on_process(processed_code)
+
+        try:
+            tree = ast.parse(processed_code)
+        except Exception as e:
+            error = Error.from_exception(e)
+            return blocks, error, feedback, response
+
+        for node in tree.body:
+            block = ast.unparse(node).strip()
+            blocks.append(block)
+
+            if self.callbacks.on_execute:
+                self.callbacks.on_execute(block)
+
+            try:
+                await execute_code(block, context)
+
+            except FeedbackException as e:
+                feedback = e.feedback
+                break
+
+            except ResponseException as e:
+                response = e.response
+                break
+
+            except Exception as e:
+                error = Error.from_exception(e)
+                feedback = UnexpectedErrorFeedback(error=error)
+                break
+
+            feedback = pop_feedback()
+            response = pop_response()
+
+            if feedback or response:
+                break
+
+        if not feedback and not response:
+            feedback = IncompleteCycleFeedback()
+
+        return blocks, error, feedback, response

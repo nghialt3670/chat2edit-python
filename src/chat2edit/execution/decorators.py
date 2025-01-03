@@ -1,6 +1,6 @@
 import inspect
 from functools import wraps
-from typing import Callable
+from typing import Callable, get_type_hints
 
 from pydantic import ConfigDict, TypeAdapter
 
@@ -22,11 +22,12 @@ def feedback_invalid_parameter_type(func: Callable):
         signature = inspect.signature(func)
         bound_args = signature.bind(*args, **kwargs)
         bound_args.apply_defaults()
+        hints = get_type_hints(func)
 
         for param_name, param_value in bound_args.arguments.items():
-            param_anno = signature.parameters[param_name].annotation
+            param_anno = hints.get(param_name)
 
-            if param_anno is inspect.Signature.empty:
+            if not param_anno:
                 continue
 
             try:
@@ -64,7 +65,7 @@ def feedback_ignored_return_value(func: Callable):
         if not any(" = " in line for line in instructions):
             feedback = IgnoredReturnValueFeedback(
                 function=func.__name__,
-                value_type=anno_repr(func.__annotations__.get("return", None)),
+                value_type=anno_repr(get_type_hints(func).get("return")),
             )
             raise FeedbackException(feedback)
 
