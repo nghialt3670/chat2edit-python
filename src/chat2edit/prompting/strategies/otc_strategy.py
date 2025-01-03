@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from chat2edit.base import PromptStrategy
@@ -14,7 +15,7 @@ from chat2edit.prompting.stubbing.stubs import CodeStub
 
 OTC_PROMPT_TEMPLATE = """Given this context code:
 
-```
+```python
 {context_code}
 ```
 
@@ -22,8 +23,7 @@ Follow these exemplary observation-thinking-commands sequences:
 
 {exemplary_otc_sequences}
 
-Give the next thinking and commands for the current sequence:
-Note: Answer in plain text
+Give the next thinking and commands for the current sequences:
 
 {current_otc_sequences}"""
 
@@ -31,7 +31,7 @@ OTC_REFINE_PROMPT = """Please answer in this format:
 
 thinking: <YOUR_THINKING>
 commands:
-```
+```python
 <YOUR_COMMANDS>
 ```"""
 
@@ -39,7 +39,7 @@ INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, argum
 MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE = "The variable `{variable}` holds an attachment, which cannot be modified directly. To make changes, create a copy of the object using `deepcopy` and modify the copy instead."
 IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE = "The function `{function}` returns a value of type `{value_type}`, but it is not utilized in the code."
 FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE = (
-    "Unexpected error occurred in function `{func_name}`."
+    "Unexpected error occurred in function `{function}`."
 )
 GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT = "Unexpected error occurred."
 INCOMPLETE_CYCLE_FEEDBACK_TEXT = "The commands executed successfully. Please continue."
@@ -83,23 +83,19 @@ class OtcStrategy(PromptStrategy):
         request_obs = self.create_observation_from_request(cycle.request)
         otc_sequence += f"observation: {request_obs}\n"
 
-        if cycle.loops:
-            for loop in cycle.loops:
-                if not loop.answers:
-                    continue
+        for loop in cycle.loops:
+            if not loop.answers:
+                continue
 
-                thinking, _ = self.extract_thinking_commands(loop.answers[-1])
-                commands = "\n".join(loop.blocks)
+            thinking, _ = self.extract_thinking_commands(loop.answers[-1])
+            commands = "\n".join(loop.blocks)
 
-                otc_sequence += f"thinking: {thinking}\n"
-                otc_sequence += f"commands:\n```\n{commands}\n```\n"
+            otc_sequence += f"thinking: {thinking}\n"
+            otc_sequence += f"commands:\n```python\n{commands}\n```\n"
 
-                if loop.feedback:
-                    feedback_obs = self.create_observation_from_feedback(loop.feedback)
-                    otc_sequence += f"observation: {feedback_obs}\n"
-        else:
-            otc_sequence += "thinking: ...\n"
-            otc_sequence += "commands:\n```\n...\n```"
+            if loop.feedback:
+                feedback_obs = self.create_observation_from_feedback(loop.feedback)
+                otc_sequence += f"observation: {feedback_obs}\n"
 
         return otc_sequence
 
@@ -164,7 +160,7 @@ class OtcStrategy(PromptStrategy):
             if part.strip()
         ]
 
-        thinking = parts[-2] if len(parts) >= 2 else None
-        commands = parts[-1].replace("```", "") if len(parts) >= 2 else None
+        thinking = parts[-2]
+        commands = re.search(r"```python(.*?)```", parts[-1], re.DOTALL).group(1).strip()
 
         return thinking, commands
