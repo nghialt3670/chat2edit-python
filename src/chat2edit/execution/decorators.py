@@ -39,7 +39,7 @@ def feedback_invalid_parameter_type(func: Callable):
                     function=func.__name__,
                     parameter=param_name,
                     expected_type=anno_repr(param_anno),
-                    provided_type=type(param_value).__name__,
+                    received_type=type(param_value).__name__,
                 )
                 raise FeedbackException(feedback)
 

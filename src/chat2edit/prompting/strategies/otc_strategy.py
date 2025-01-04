@@ -25,6 +25,7 @@ Follow these exemplary observation-thinking-commands sequences:
 {exemplary_otc_sequences}
 
 Give the next thinking and commands for the current sequences:
+Note: Do not use indentation (if, while, with,...).
 
 {current_otc_sequences}
 """.strip()
