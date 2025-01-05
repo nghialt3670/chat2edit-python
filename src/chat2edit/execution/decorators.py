@@ -33,6 +33,10 @@ def feedback_invalid_parameter_type(func: Callable):
             try:
                 config = ConfigDict(arbitrary_types_allowed=True)
                 adaptor = TypeAdapter(param_anno, config=config)
+            except:
+                adaptor = TypeAdapter(param_anno)
+                
+            try:
                 adaptor.validate_python(param_value)
             except:
                 feedback = InvalidParameterTypeFeedback(
