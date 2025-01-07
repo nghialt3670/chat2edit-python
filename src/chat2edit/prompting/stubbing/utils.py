@@ -4,7 +4,7 @@ import re
 import sys
 import textwrap
 from itertools import chain
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Optional
 
 
 def get_ast_node(target: Any) -> ast.AST:
@@ -13,7 +13,7 @@ def get_ast_node(target: Any) -> ast.AST:
     return next(root)
 
 
-def get_node_doc(node: ast.AST) -> str:
+def get_node_doc(node: ast.AST) -> Optional[str]:
     if (
         node.body
         and isinstance(node.body[0], ast.Expr)

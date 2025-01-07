@@ -11,6 +11,7 @@ from chat2edit.prompting.stubbing.stubs import (
     ImportInfo,
     ImportNodeType,
 )
+from chat2edit.prompting.stubbing.utils import get_node_doc
 
 
 class ClassStubBuilder(ast.NodeVisitor):
@@ -23,6 +24,7 @@ class ClassStubBuilder(ast.NodeVisitor):
             name=node.name,
             bases=list(map(ast.unparse, node.bases)),
             decorators=list(map(ast.unparse, node.decorator_list)),
+            docstring=get_node_doc(node),
         )
         self.visit(node)
         return self.stub

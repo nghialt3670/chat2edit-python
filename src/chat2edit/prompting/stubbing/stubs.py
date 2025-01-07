@@ -141,15 +141,15 @@ class FunctionStub:
         stub.function = func
         return stub
 
-    def generate(self) -> str:
+    def generate(self, indent_spaces: int = 4) -> str:
         dec_names = set(dec.split("(")[0] for dec in self.decorators)
         docstring = (
-            False
+            None
             if self.function and hasattr(self.function, DOCSTRING_EXCLUDED_KEY)
             else self.docstring
         )
         coroutine = (
-            False
+            None
             if self.function and hasattr(self.function, COROUTINE_EXCLUDED_KEY)
             else self.coroutine
         )
@@ -172,14 +172,18 @@ class FunctionStub:
             for dec in decorators:
                 stub += f"@{dec}\n"
 
-        if docstring:
-            for line in docstring.split("\n"):
-                stub += f"# {line}\n"
-
         if coroutine:
             stub += "async "
 
         stub += f"def {name}{signature}: ..."
+
+        if docstring:
+            stub += "\n"
+            indent = " " * indent_spaces
+
+            stub += textwrap.indent('"""\n', indent)
+            stub += textwrap.indent(f"{docstring}\n", indent)
+            stub += textwrap.indent('"""\n', indent)
 
         if param_to_alias:
             stub = ParameterReplacer.replace(stub, param_to_alias)

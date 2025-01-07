@@ -35,7 +35,7 @@ def feedback_invalid_parameter_type(func: Callable):
                 adaptor = TypeAdapter(param_anno, config=config)
             except:
                 adaptor = TypeAdapter(param_anno)
-                
+
             try:
                 adaptor.validate_python(param_value)
             except:
