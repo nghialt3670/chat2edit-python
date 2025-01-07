@@ -175,15 +175,17 @@ class FunctionStub:
         if coroutine:
             stub += "async "
 
-        stub += f"def {name}{signature}: ..."
+        stub += f"def {name}{signature}:"        
 
         if docstring:
             stub += "\n"
             indent = " " * indent_spaces
-
             stub += textwrap.indent('"""\n', indent)
             stub += textwrap.indent(f"{docstring}\n", indent)
             stub += textwrap.indent('"""\n', indent)
+            stub += textwrap.indent("...", indent)
+        else:
+            stub += " ..."
 
         if param_to_alias:
             stub = ParameterReplacer.replace(stub, param_to_alias)
