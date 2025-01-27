@@ -14,18 +14,18 @@ from chat2edit.models import ChatCycle, Message
 from chat2edit.prompting.stubbing.stubs import CodeStub
 
 OTC_PROMPT_TEMPLATE = """
-Given this context code:
+Analyze the following context code:
 
-```python
 {context_code}
-```
 
-Follow these exemplary observation-thinking-commands sequences:
+Refer to these exemplary observation-thinking-commands sequences:
 
 {exemplary_otc_sequences}
 
-Give the next thinking and commands for the current sequences:
-Note: Do not use indentation (if, while, with,...), do not reuse variable names.
+Now, provide the next thinking and commands for the given sequences.  
+Guidelines:  
+- Avoid using indentation (e.g., no if, while, with, try, catch, etc.).  
+- Do not reuse variable names.  
 
 {current_otc_sequences}
 """.strip()
@@ -80,11 +80,14 @@ class OtcStrategy(PromptStrategy):
         exemplars: List[ChatCycle],
         context: Dict[str, Any],
     ) -> str:
-        context_code = self.create_context_code(context)
+        prompting_context = self.filter_context(context)
+        context_code = self.create_context_code(prompting_context)
+
         exemplary_otc_sequences = "\n\n".join(
             f"Exemplar {idx + 1}:\n{self.create_otc_sequences(cycle)}"
             for idx, cycle in enumerate(exemplars)
         )
+        
         current_otc_sequences = "\n".join(map(self.create_otc_sequences, cycles))
 
         return OTC_PROMPT_TEMPLATE.format(
@@ -95,6 +98,9 @@ class OtcStrategy(PromptStrategy):
 
     def get_refine_prompt(self) -> str:
         return OTC_REFINE_PROMPT
+    
+    def filter_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return context
 
     def extract_code(self, text: str) -> str:
         _, code = self.extract_thinking_commands(text)
