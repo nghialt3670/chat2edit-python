@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
+import black
 from chat2edit.prompting.stubbing.constants import (
     ATTRIBUTE_MAP_FUNCTION_KEY,
     ATTRIBUTE_TO_ALIAS_KEY,
@@ -431,26 +432,13 @@ class CodeStub:
         return cls(mappings, blocks)
 
     def generate(self) -> str:
-        stub = ""
-        prev = None
-
-        for block in self.blocks:
-            if not prev:
-                stub += f"{block}\n"
-                prev = block
-                continue
-
-            if type(prev) != type(block) or isinstance(block, ClassStub):
-                stub += "\n"
-
-            stub += f"{block}\n"
-            prev = block
+        stub = "\n".join(self.blocks)
 
         if self.mappings:
             for k, v in self.mappings.items():
                 stub = stub.replace(k, v)
 
-        return stub.strip()
+        return black.format_str(stub, mode=black.Mode(line_length=1000, is_pyi=True))
 
     def __repr__(self) -> str:
         return self.generate()

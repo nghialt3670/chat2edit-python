@@ -87,7 +87,7 @@ class OtcStrategy(PromptStrategy):
             f"Exemplar {idx + 1}:\n{self.create_otc_sequences(cycle)}"
             for idx, cycle in enumerate(exemplars)
         )
-        
+
         current_otc_sequences = "\n".join(map(self.create_otc_sequences, cycles))
 
         return OTC_PROMPT_TEMPLATE.format(
@@ -98,7 +98,7 @@ class OtcStrategy(PromptStrategy):
 
     def get_refine_prompt(self) -> str:
         return OTC_REFINE_PROMPT
-    
+
     def filter_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         return context
 
