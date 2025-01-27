@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chat2edit"
-version = "2.1.6"
+version = "2.1.7"
 authors = ["Le Tin Nghia <nghialt3670@gmail.com>"]
 description = "A small example package"
 readme = "README.md"
@@ -22,5 +22,3 @@ black = "==24.10.0"
 [tool.poetry.urls]
 Homepage = "https://github.com/nghialt3670/chat2edit-python"
 Issues = "https://github.com/nghialt3670/chat2edit-python/issues"
-
-

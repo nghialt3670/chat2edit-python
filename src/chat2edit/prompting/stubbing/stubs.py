@@ -158,10 +158,12 @@ class FunctionStub:
 
         param_to_alias = getattr(self, PARAMETER_TO_ALIAS_KEY, None)
 
-        if included_decs := getattr(self.function, INCLUDED_DECORATORS_KEY, None):
+        included_decs = getattr(self.function, INCLUDED_DECORATORS_KEY, None)
+        if included_decs is not None:
             dec_names.intersection_update(included_decs)
 
-        if excluded_decs := getattr(self.function, EXCLUDED_DECORATORS_KEY, None):
+        excluded_decs = getattr(self.function, EXCLUDED_DECORATORS_KEY, None)
+        if excluded_decs is not None:
             dec_names.difference_update(excluded_decs)
 
         decorators = filter(lambda x: x.split("(")[0] in dec_names, self.decorators)
@@ -263,28 +265,36 @@ class ClassStub:
         if excluded_methods:
             method_names.difference_update(excluded_methods)
 
-        if included_decs := getattr(self.clss, INCLUDED_DECORATORS_KEY, None):
+        included_decs = getattr(self.clss, INCLUDED_DECORATORS_KEY, None)
+        if included_decs is not None:
             dec_names.intersection_update(included_decs)
 
-        if excluded_decs := getattr(self.clss, EXCLUDED_DECORATORS_KEY, None):
+        excluded_decs = getattr(self.clss, EXCLUDED_DECORATORS_KEY, None)
+        if excluded_decs is not None:
             dec_names.difference_update(excluded_decs)
 
-        if included_bases := getattr(self.clss, INCLUDED_BASES_KEY, None):
+        included_bases = getattr(self.clss, INCLUDED_BASES_KEY, None)
+        if included_bases is not None:
             bases.intersection_update(included_bases)
 
-        if excluded_bases := getattr(self.clss, EXCLUDED_BASES_KEY, None):
+        excluded_bases = getattr(self.clss, EXCLUDED_BASES_KEY, None)
+        if excluded_bases is not None:
             bases.difference_update(excluded_bases)
 
-        if included_attrs := getattr(self.clss, INCLUDED_ATTRIBUTES_KEY, None):
+        included_attrs = getattr(self.clss, INCLUDED_ATTRIBUTES_KEY, None)
+        if included_attrs is not None:
             attr_names.intersection_update(included_attrs)
 
-        if excluded_attrs := getattr(self.clss, EXCLUDED_ATTRIBUTES_KEY, None):
+        excluded_attrs = getattr(self.clss, EXCLUDED_ATTRIBUTES_KEY, None)
+        if excluded_attrs is not None:
             attr_names.difference_update(excluded_attrs)
 
-        if included_methods := getattr(self.clss, INCLUDED_METHODS_KEY, None):
+        included_methods = getattr(self.clss, INCLUDED_METHODS_KEY, None)
+        if included_methods is not None:
             method_names.intersection_update(included_methods)
 
-        if excluded_methods := getattr(self.clss, EXCLUDED_METHODS_KEY, None):
+        excluded_methods = getattr(self.clss, EXCLUDED_METHODS_KEY, None)
+        if excluded_methods is not None:
             method_names.difference_update(excluded_methods)
 
         decorators = filter(lambda x: x.split("(")[0] in dec_names, self.decorators)
@@ -313,7 +323,10 @@ class ClassStub:
         for method in methods:
             # Prevent method from being decorated by @alias
             if method.function:
-                method.function.__name__ = method.name
+                try:
+                    method.function.__name__ = method.name
+                except:
+                    pass
 
             if method_map_func:
                 method.name = method_map_func(method.name)
