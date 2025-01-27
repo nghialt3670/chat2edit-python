@@ -432,7 +432,7 @@ class CodeStub:
         return cls(mappings, blocks)
 
     def generate(self) -> str:
-        stub = "\n".join(self.blocks)
+        stub = "\n".join(map(str, self.blocks))
 
         if self.mappings:
             for k, v in self.mappings.items():
