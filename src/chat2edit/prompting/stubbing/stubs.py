@@ -156,7 +156,7 @@ class FunctionStub:
         name = self.function.__name__ if self.function else self.name
         signature = self.signature
 
-        param_to_alias = getattr(self, PARAMETER_TO_ALIAS_KEY, None)
+        param_to_alias = getattr(self.function, PARAMETER_TO_ALIAS_KEY, None)
 
         included_decs = getattr(self.function, INCLUDED_DECORATORS_KEY, None)
         if included_decs is not None:
