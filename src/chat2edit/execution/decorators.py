@@ -1,4 +1,5 @@
 import inspect
+from copy import deepcopy
 from functools import wraps
 from typing import Callable, get_type_hints
 
@@ -12,7 +13,10 @@ from chat2edit.execution.feedbacks import (
 )
 from chat2edit.execution.signaling import set_response
 from chat2edit.models import Error
-from chat2edit.prompting.stubbing.decorators import exclude_this_decorator
+from chat2edit.prompting.stubbing.decorators import (
+    exclude_this_decorator,
+    exclude_this_decorator_factory,
+)
 from chat2edit.utils.repr import anno_repr
 
 
@@ -111,6 +115,40 @@ def feedback_unexpected_error(func: Callable):
             raise FeedbackException(feedback)
 
     return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+
+
+@exclude_this_decorator_factory
+def deepcopy_parameter(param: str) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        def check_and_transform_args_kwargs(args, kwargs):
+            params = func.__code__.co_varnames[: func.__code__.co_argcount]
+
+            if param in params:
+                index = params.index(param)
+                if index < len(args):
+                    args = tuple(
+                        deepcopy(arg) if i == index else arg
+                        for i, arg in enumerate(args)
+                    )
+
+            if param in kwargs:
+                kwargs[param] = deepcopy(kwargs[param])
+
+            return args, kwargs
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            args, kwargs = check_and_transform_args_kwargs(args, kwargs)
+            return func(*args, **kwargs)
+
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            args, kwargs = check_and_transform_args_kwargs(args, kwargs)
+            return await func(*args, **kwargs)
+
+        return async_wrapper if inspect.iscoroutinefunction(func) else wrapper
+
+    return decorator
 
 
 @exclude_this_decorator

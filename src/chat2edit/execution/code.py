@@ -14,7 +14,7 @@ def process_code(code: str, context: Dict[str, Any]) -> str:
 async def execute_code(code: str, context: Dict[str, Any]) -> None:
     InteractiveShell.cleanup()
     InteractiveShell.clear_instance()
-    
+
     shell = InteractiveShell.instance()
 
     shell.user_ns.update(context)

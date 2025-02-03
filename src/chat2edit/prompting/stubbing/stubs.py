@@ -6,6 +6,7 @@ from types import ModuleType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import black
+
 from chat2edit.prompting.stubbing.constants import (
     ATTRIBUTE_MAP_FUNCTION_KEY,
     ATTRIBUTE_TO_ALIAS_KEY,
