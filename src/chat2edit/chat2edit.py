@@ -236,4 +236,4 @@ class Chat2Edit:
         if not feedback and not response:
             feedback = IncompleteCycleFeedback()
 
-        return blocks, processed_block, error, feedback, response
+        return blocks, processed_blocks, error, feedback, response
