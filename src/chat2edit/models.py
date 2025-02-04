@@ -34,6 +34,7 @@ class PromptExecuteLoop(BaseModel):
     prompts: List[str] = Field(default_factory=list)
     answers: List[str] = Field(default_factory=list)
     blocks: List[str] = Field(default_factory=list)
+    processed_blocks: List[str] = Field(default_factory=list)
     error: Optional[Error] = Field(default=None)
     feedback: Optional[Feedback] = Field(default=None)
 

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chat2edit"
-version = "2.3.0"
+version = "2.3.1"
 authors = ["Le Tin Nghia <nghialt3670@gmail.com>"]
 description = "A small example package"
 readme = "README.md"

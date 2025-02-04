@@ -102,8 +102,8 @@ class Chat2Edit:
             if not code:
                 break
 
-            loop.blocks, loop.error, loop.feedback, response = await self._execute(
-                code, cycle.context
+            loop.blocks, loop.processed_blocks, loop.error, loop.feedback, response = (
+                await self._execute(code, cycle.context)
             )
 
             if loop.feedback:
@@ -186,19 +186,17 @@ class Chat2Edit:
 
     async def _execute(
         self, code: str, context: Dict[str, Any]
-    ) -> Tuple[List[str], Optional[Error], Optional[Feedback], Optional[Message]]:
+    ) -> Tuple[
+        List[str], List[str], Optional[Error], Optional[Feedback], Optional[Message]
+    ]:
         blocks = []
+        processed_blocks = []
         error = None
         feedback = None
         response = None
 
-        processed_code = process_code(code, context)
-
-        if self.callbacks.on_process:
-            self.callbacks.on_process(processed_code)
-
         try:
-            tree = ast.parse(processed_code)
+            tree = ast.parse(code)
         except Exception as e:
             error = Error.from_exception(e)
             return blocks, error, feedback, response
@@ -210,8 +208,11 @@ class Chat2Edit:
             if self.callbacks.on_execute:
                 self.callbacks.on_execute(block)
 
+            processed_block = process_code(block, context)
+            processed_blocks.append(processed_block)
+
             try:
-                await execute_code(block, context)
+                await execute_code(processed_block, context)
 
             except FeedbackException as e:
                 feedback = e.feedback
@@ -235,4 +236,4 @@ class Chat2Edit:
         if not feedback and not response:
             feedback = IncompleteCycleFeedback()
 
-        return blocks, error, feedback, response
+        return blocks, processed_block, error, feedback, response
