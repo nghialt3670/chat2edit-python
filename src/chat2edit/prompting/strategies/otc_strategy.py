@@ -24,8 +24,9 @@ Refer to these exemplary observation-thinking-commands sequences:
 
 Now, provide the next thinking and commands for the given sequences.  
 Guidelines:  
+- Only use the provided context code. 
 - Avoid using indentation (e.g., no if, while, with, try, catch, etc.).  
-- Do not reuse variable names.  
+- Do not reuse variable names. 
 
 {current_otc_sequences}
 """.strip()
@@ -66,10 +67,14 @@ commands:
 INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, argument for `{parameter}` must be of type `{expected_type}`, but received type `{received_type}`"
 MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE = "The variable `{variable}` holds an attachment, which cannot be modified directly. To make changes, create a copy of the object using `deepcopy` and modify the copy instead."
 IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE = "The function `{function}` returns a value of type `{value_type}`, but it is not utilized in the code."
-FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE = (
-    "Unexpected error occurred in function `{function}`."
-)
-GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT = "Unexpected error occurred."
+FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE = """
+Unexpected error occurred in function `{function}`:
+{message}
+""".strip()
+GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE = """
+Unexpected error occurred:
+{message}
+""".strip()
 INCOMPLETE_CYCLE_FEEDBACK_TEXT = "The commands executed successfully. Please continue."
 
 
@@ -167,10 +172,13 @@ class OtcStrategy(PromptStrategy):
         elif isinstance(feedback, UnexpectedErrorFeedback):
             if feedback.function:
                 return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.function
+                    function=feedback.function,
+                    message=feedback.error.message
                 )
             else:
-                return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT
+                return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
+                    message=feedback.error.message
+                )
 
         elif isinstance(feedback, IncompleteCycleFeedback):
             return INCOMPLETE_CYCLE_FEEDBACK_TEXT
