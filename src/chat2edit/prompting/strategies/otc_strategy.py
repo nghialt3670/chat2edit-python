@@ -16,7 +16,9 @@ from chat2edit.prompting.stubbing.stubs import CodeStub
 OTC_PROMPT_TEMPLATE = """
 Analyze the following context code:
 
+```python
 {context_code}
+```
 
 Refer to these exemplary observation-thinking-commands sequences:
 
@@ -172,8 +174,7 @@ class OtcStrategy(PromptStrategy):
         elif isinstance(feedback, UnexpectedErrorFeedback):
             if feedback.function:
                 return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.function,
-                    message=feedback.error.message
+                    function=feedback.function, message=feedback.error.message
                 )
             else:
                 return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(

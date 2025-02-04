@@ -439,7 +439,9 @@ class CodeStub:
             for k, v in self.mappings.items():
                 stub = stub.replace(k, v)
 
-        return black.format_str(stub, mode=black.Mode(line_length=1000, is_pyi=True))
+        return black.format_str(
+            stub, mode=black.Mode(line_length=1000, is_pyi=True)
+        ).strip()
 
     def __repr__(self) -> str:
         return self.generate()
