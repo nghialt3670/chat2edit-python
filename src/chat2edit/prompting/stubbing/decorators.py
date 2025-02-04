@@ -6,6 +6,7 @@ from chat2edit.prompting.stubbing.constants import (
     ATTRIBUTE_MAP_FUNCTION_KEY,
     ATTRIBUTE_TO_ALIAS_KEY,
     BASE_TO_ALIAS_KEY,
+    COMMENT_KEY,
     COROUTINE_EXCLUDED_KEY,
     DOCSTRING_EXCLUDED_KEY,
     EXCLUDED_ATTRIBUTES_KEY,
@@ -284,3 +285,12 @@ def exclude_docstring(target: Any) -> Any:
 def exclude_coroutine(func: Callable) -> Callable:
     setattr(func, COROUTINE_EXCLUDED_KEY, True)
     return func
+
+
+@exclude_this_decorator_factory
+def comment(comment: str):
+    def decorator(func: Callable):
+        setattr(func, COMMENT_KEY, comment)
+        return func
+
+    return decorator

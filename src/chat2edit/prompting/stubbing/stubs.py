@@ -11,6 +11,7 @@ from chat2edit.prompting.stubbing.constants import (
     ATTRIBUTE_MAP_FUNCTION_KEY,
     ATTRIBUTE_TO_ALIAS_KEY,
     BASE_TO_ALIAS_KEY,
+    COMMENT_KEY,
     COROUTINE_EXCLUDED_KEY,
     DOCSTRING_EXCLUDED_KEY,
     EXCLUDED_ATTRIBUTES_KEY,
@@ -144,6 +145,7 @@ class FunctionStub:
         return stub
 
     def generate(self, indent_spaces: int = 4) -> str:
+        comment = getattr(self.function, COMMENT_KEY, None)
         dec_names = set(dec.split("(")[0] for dec in self.decorators)
         docstring = (
             None
@@ -171,6 +173,9 @@ class FunctionStub:
         decorators = filter(lambda x: x.split("(")[0] in dec_names, self.decorators)
 
         stub = ""
+
+        if comment:
+            stub += f"# {comment}\n"
 
         if decorators:
             for dec in decorators:

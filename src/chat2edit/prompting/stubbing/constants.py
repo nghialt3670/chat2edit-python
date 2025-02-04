@@ -20,3 +20,5 @@ METHOD_MAP_FUNCTION_KEY = "__attribute_map_function__"
 
 DOCSTRING_EXCLUDED_KEY = "__docstring_excluded__"
 COROUTINE_EXCLUDED_KEY = "__coroutine_excluded__"
+
+COMMENT_KEY = "__comment__"
