@@ -199,7 +199,7 @@ class Chat2Edit:
             tree = ast.parse(code)
         except Exception as e:
             error = Error.from_exception(e)
-            return blocks, error, feedback, response
+            return blocks, processed_blocks, error, feedback, response
 
         for node in tree.body:
             block = ast.unparse(node).strip()
