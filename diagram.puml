@@ -1,0 +1,329 @@
+@startuml Chat2Edit Framework Class Diagram
+
+!define ABSTRACT_CLASS abstract class
+!define INTERFACE interface
+
+package "Core Framework" {
+    class Chat2Edit {
+        - cycles: List[ChatCycle]
+        - llm: Llm
+        - provider: ContextProvider
+        - strategy: PromptStrategy
+        - config: Chat2EditConfig
+        - callbacks: Chat2EditCallbacks
+        + __init__(cycles, llm, provider, strategy, config, callbacks)
+        + send(message: Message): Optional[Message]
+        - _contextualize(target, context, existed: bool)
+        - _prompt(cycles): Tuple[List[str], List[str], Optional[Error], Optional[str]]
+        - _execute(code: str, context): Tuple[...]
+    }
+
+    class Chat2EditConfig {
+        + max_cycles_per_prompt: int = 15
+        + max_loops_per_cycle: int = 4
+        + max_prompts_per_loop: int = 2
+    }
+
+    class Chat2EditCallbacks {
+        + on_request: Optional[Callable]
+        + on_prompt: Optional[Callable]
+        + on_answer: Optional[Callable]
+        + on_extract: Optional[Callable]
+        + on_process: Optional[Callable]
+        + on_execute: Optional[Callable]
+        + on_feedback: Optional[Callable]
+        + on_respond: Optional[Callable]
+    }
+}
+
+package "Base Interfaces" {
+    ABSTRACT_CLASS ContextProvider {
+        + {abstract} get_context(): Dict[str, Any]
+        + {abstract} get_exemplars(): List[ChatCycle]
+    }
+
+    ABSTRACT_CLASS Llm {
+        + {abstract} generate(messages: List[str]): str
+    }
+
+    ABSTRACT_CLASS PromptStrategy {
+        + {abstract} create_prompt(cycles, exemplars, context): str
+        + {abstract} get_refine_prompt(): str
+        + {abstract} extract_code(text: str): str
+    }
+}
+
+package "Data Models" {
+    class Timestamped {
+        + timestamp: int
+    }
+
+    class Message {
+        + text: str
+        + attachments: List[Any]
+    }
+
+    class Error {
+        + message: str
+        + stack_trace: str
+        + {static} from_exception(exc: Exception): Error
+    }
+
+    class Feedback {
+        + severity: Severity
+        + attachments: List[Any]
+    }
+
+    class PromptExecuteLoop {
+        + prompts: List[str]
+        + answers: List[str]
+        + blocks: List[str]
+        + processed_blocks: List[str]
+        + error: Optional[Error]
+        + feedback: Optional[Feedback]
+    }
+
+    class ChatCycle {
+        + request: Message
+        + response: Optional[Message]
+        + context: Dict[str, Any]
+        + loops: List[PromptExecuteLoop]
+    }
+}
+
+package "LLM Implementations" {
+    class OpenAILlm {
+        - model_name: str
+        - system_message: Optional[str]
+        - max_tokens: Optional[int]
+        - temperature: Optional[float]
+        - stop: Optional[Iterable[str]]
+        - top_p: Optional[int]
+        + set_api_key(api_key: str)
+        + generate(messages: List[str]): str
+        - _create_input_messages(messages): List[str]
+    }
+
+    class GoogleLlm {
+        - _generation_config: GenerationConfig
+        - _model: GenerativeModel
+        + set_api_key(api_key: str)
+        + generate(messages: List[str]): str
+        - _create_input_history(prev_messages): List[str]
+    }
+}
+
+package "Prompt Strategy Implementation" {
+    class OtcStrategy {
+        + create_prompt(cycles, exemplars, context): str
+        + get_refine_prompt(): str
+        + filter_context(context): Dict[str, Any]
+        + extract_code(text: str): str
+        + create_context_code(context): str
+        + create_otc_sequences(cycle: ChatCycle): str
+        + create_observation_from_request(request: Message): str
+        + create_feedback_text(feedback: Feedback): str
+        + create_observation_from_feedback(feedback: Feedback): str
+        + extract_thinking_commands(text: str): Tuple[str, str]
+    }
+}
+
+package "Context Management" {
+    class "Attachment<T>" as Attachment {
+        - __obj__: T
+        - __basename__: Optional[str]
+        - __filename__: Optional[str]
+        - __modifiable__: bool
+        + __init__(obj, basename, filename, modifiable)
+        + set_origin_modification_handler(handler)
+        - _handle_modification(member: str)
+    }
+}
+
+package "Execution System" {
+    class FeedbackException {
+        + feedback: Feedback
+    }
+
+    class ResponseException {
+        + response: Message
+    }
+
+    class SignalManager {
+        - _signals: threading.local
+        + {static} set_signal(key: str, value: Any)
+        + {static} pop_signal(key: str): Optional[Any]
+    }
+}
+
+package "Feedback Types" {
+    class InvalidParameterTypeFeedback {
+        + severity: Severity = "error"
+        + function: str
+        + parameter: str
+        + expected_type: str
+        + received_type: str
+    }
+
+    class ModifiedAttachmentFeedback {
+        + severity: Severity = "error"
+        + variable: str
+        + attribute: str
+    }
+
+    class IgnoredReturnValueFeedback {
+        + severity: Severity = "error"
+        + function: str
+        + value_type: str
+    }
+
+    class UnexpectedErrorFeedback {
+        + severity: Severity = "error"
+        + function: Optional[str]
+        + error: Error
+    }
+
+    class IncompleteCycleFeedback {
+        + severity: Severity = "info"
+        + incomplete: bool = true
+    }
+}
+
+package "Code Stubbing System" {
+    class ImportInfo {
+        + names: Tuple[str, Optional[str]]
+        + module: Optional[str]
+        + {static} from_node(node): ImportInfo
+        + {static} from_obj(obj): ImportInfo
+    }
+
+    class AssignInfo {
+        + target: str
+        + value: Optional[str]
+        + annotation: Optional[str]
+        + {static} from_node(node): AssignInfo
+    }
+
+    class FunctionStub {
+        + name: str
+        + signature: str
+        + coroutine: bool
+        + docstring: Optional[str]
+        + decorators: List[str]
+        + function: Optional[Callable]
+        + {static} from_node(node): FunctionStub
+        + {static} from_function(func): FunctionStub
+        + generate(indent_spaces: int): str
+    }
+
+    class ClassStub {
+        + name: str
+        + bases: List[str]
+        + attributes: List[AssignInfo]
+        + methods: List[FunctionStub]
+        + decorators: List[str]
+        + docstring: Optional[str]
+        + clss: Optional[Type]
+        + {static} from_node(node): ClassStub
+        + {static} from_class(clss): ClassStub
+        + generate(...): str
+    }
+
+    class CodeStub {
+        + mappings: Dict[str, str]
+        + blocks: List[CodeBlockType]
+        + {static} from_module(module): CodeStub
+        + {static} from_context(context): CodeStub
+        + generate(): str
+    }
+
+    class ClassStubBuilder {
+        - stub: ClassStub
+        + build(node: ast.ClassDef): ClassStub
+        + visit(node: ast.AST)
+    }
+
+    class CodeStubBuilder {
+        - stub: CodeStub
+        + build(node: ast.Module): CodeStub
+        + visit(node: ast.AST)
+    }
+}
+
+package "Code Processing" {
+    class AsyncCallCorrector {
+        - async_functions: Set[str]
+        + __init__(context: Dict[str, Any])
+        - _collect_async_functions(obj, prefix, visited)
+        + visit_Call(node: ast.Call)
+    }
+
+    ABSTRACT_CLASS CodeReplacer {
+        + mappings: Dict[str, str]
+        + {static} replace(code: str, mappings): str
+    }
+
+    class AttributeReplacer {
+        + visit_Assign(node: ast.Assign)
+        + visit_AnnAssign(node: ast.AnnAssign)
+    }
+
+    class MethodReplacer {
+        + visit_FunctionDef(node: ast.FunctionDef)
+        + visit_AsyncFunctionDef(node: ast.AsyncFunctionDef)
+    }
+
+    class ParameterReplacer {
+        + visit_FunctionDef(node: ast.FunctionDef)
+        + visit_AsyncFunctionDef(node: ast.AsyncFunctionDef)
+    }
+}
+
+' Inheritance relationships
+Timestamped <|-- Message
+Timestamped <|-- Error
+Timestamped <|-- Feedback
+
+Feedback <|-- InvalidParameterTypeFeedback
+Feedback <|-- ModifiedAttachmentFeedback
+Feedback <|-- IgnoredReturnValueFeedback
+Feedback <|-- UnexpectedErrorFeedback
+Feedback <|-- IncompleteCycleFeedback
+
+ContextProvider <|.. "implements"
+Llm <|.. OpenAILlm : implements
+Llm <|.. GoogleLlm : implements
+PromptStrategy <|.. OtcStrategy : implements
+
+CodeReplacer <|-- AttributeReplacer
+CodeReplacer <|-- MethodReplacer
+CodeReplacer <|-- ParameterReplacer
+
+' Composition relationships
+Chat2Edit *-- Chat2EditConfig
+Chat2Edit *-- Chat2EditCallbacks
+Chat2Edit o-- ContextProvider
+Chat2Edit o-- Llm
+Chat2Edit o-- PromptStrategy
+
+ChatCycle *-- Message
+ChatCycle *-- PromptExecuteLoop
+PromptExecuteLoop o-- Error
+PromptExecuteLoop o-- Feedback
+
+ClassStub *-- AssignInfo
+ClassStub *-- FunctionStub
+CodeStub *-- ImportInfo
+CodeStub *-- ClassStub
+CodeStub *-- FunctionStub
+
+FeedbackException *-- Feedback
+ResponseException *-- Message
+UnexpectedErrorFeedback *-- Error
+
+' Usage relationships
+Chat2Edit ..> ChatCycle : uses
+OtcStrategy ..> CodeStub : uses
+AsyncCallCorrector ..> "ast processing" : processes
+
+@enduml
