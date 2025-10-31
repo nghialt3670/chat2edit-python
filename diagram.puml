@@ -8,7 +8,7 @@ package "Core Framework" {
         - cycles: List[ChatCycle]
         - llm: Llm
         - provider: ContextProvider
-        - strategy: PromptStrategy
+        - strategy: PromptingStrategy
         - config: Chat2EditConfig
         - callbacks: Chat2EditCallbacks
         + __init__(cycles, llm, provider, strategy, config, callbacks)
@@ -46,7 +46,7 @@ package "Base Interfaces" {
         + {abstract} generate(messages: List[str]): str
     }
 
-    ABSTRACT_CLASS PromptStrategy {
+    ABSTRACT_CLASS PromptingStrategy {
         + {abstract} create_prompt(cycles, exemplars, context): str
         + {abstract} get_refine_prompt(): str
         + {abstract} extract_code(text: str): str
@@ -293,7 +293,7 @@ Feedback <|-- IncompleteCycleFeedback
 ContextProvider <|.. "implements"
 Llm <|.. OpenAILlm : implements
 Llm <|.. GoogleLlm : implements
-PromptStrategy <|.. OtcStrategy : implements
+PromptingStrategy <|.. OtcStrategy : implements
 
 CodeReplacer <|-- AttributeReplacer
 CodeReplacer <|-- MethodReplacer
@@ -304,7 +304,7 @@ Chat2Edit *-- Chat2EditConfig
 Chat2Edit *-- Chat2EditCallbacks
 Chat2Edit o-- ContextProvider
 Chat2Edit o-- Llm
-Chat2Edit o-- PromptStrategy
+Chat2Edit o-- PromptingStrategy
 
 ChatCycle *-- Message
 ChatCycle *-- PromptExecuteLoop
