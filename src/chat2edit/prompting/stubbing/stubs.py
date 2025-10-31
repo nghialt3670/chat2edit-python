@@ -403,9 +403,6 @@ class CodeStub:
         blocks = []
 
         for k, v in context.items():
-            if not inspect.isclass(v) and not inspect.isfunction(v):
-                continue
-
             if is_external_package(v):
                 info = ImportInfo.from_obj(v)
 
