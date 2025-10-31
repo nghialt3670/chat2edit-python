@@ -1,7 +1,7 @@
 import threading
 from typing import Any, Optional
 
-from chat2edit.models import Feedback, Message
+from chat2edit.models import ChatMessage, ExecutionFeedback
 
 RESPONSE_SIGNAL_KEY = "__response__"
 FEEDBACK_SIGNAL_KEY = "__feedback__"
@@ -25,17 +25,17 @@ class SignalManager:
         return signal
 
 
-def set_response(response: Message) -> None:
+def set_response(response: ChatMessage) -> None:
     SignalManager.set_signal(RESPONSE_SIGNAL_KEY, response)
 
 
-def pop_response() -> Optional[Message]:
+def pop_response() -> Optional[ChatMessage]:
     return SignalManager.pop_signal(RESPONSE_SIGNAL_KEY)
 
 
-def set_feedback(feedback: Feedback) -> None:
+def set_feedback(feedback: ExecutionFeedback) -> None:
     SignalManager.set_signal(FEEDBACK_SIGNAL_KEY, feedback)
 
 
-def pop_feedback() -> Optional[Feedback]:
+def pop_feedback() -> Optional[ExecutionFeedback]:
     return SignalManager.pop_signal(FEEDBACK_SIGNAL_KEY)

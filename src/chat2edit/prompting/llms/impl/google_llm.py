@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import google.generativeai as genai
@@ -50,6 +51,7 @@ class GoogleLlm(Llm):
             generation_config=self._generation_config,
             system_instruction=system_instruction,
         )
+        self.set_api_key(os.getenv("GOOGLE_API_KEY"))
 
     def set_api_key(self, api_key: str) -> None:
         genai.configure(api_key=api_key)

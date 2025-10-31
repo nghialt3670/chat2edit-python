@@ -2,9 +2,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from chat2edit.models.execution_error import ExecutionError
 from chat2edit.models.contextualized_feedback import ContextualizedFeedback
 from chat2edit.models.contextualized_message import ContextualizedMessage
+from chat2edit.models.execution_error import ExecutionError
 
 
 class ExecutionBlock(BaseModel):

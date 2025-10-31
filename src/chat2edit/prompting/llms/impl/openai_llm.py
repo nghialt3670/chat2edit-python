@@ -1,4 +1,5 @@
-from typing import Any, Coroutine, Dict, Iterable, List, Optional, Tuple
+import os
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import openai
 
@@ -23,6 +24,7 @@ class OpenAILlm(Llm):
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._top_p = top_p
+        self.set_api_key(os.getenv("OPENAI_API_KEY"))
 
     def set_api_key(self, api_key: str) -> None:
         openai.api_key = api_key

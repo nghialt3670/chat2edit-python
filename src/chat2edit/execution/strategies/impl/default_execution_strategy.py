@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from IPython.core.interactiveshell import InteractiveShell
 
 from chat2edit.execution.exceptions import FeedbackException, ResponseException
+from chat2edit.execution.signaling import pop_feedback, pop_response
 from chat2edit.execution.strategies.execution_strategy import ExecutionStrategy
 from chat2edit.execution.utils import fix_unawaited_async_calls
 from chat2edit.models import ChatMessage, ExecutionError, ExecutionFeedback
@@ -59,4 +60,4 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         finally:
             logs = [line for line in log_buffer.getvalue().splitlines() if line]
 
-        return feedback, response, error, logs
+        return feedback or pop_feedback(), response or pop_response(), error, logs

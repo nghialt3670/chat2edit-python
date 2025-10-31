@@ -96,11 +96,11 @@ class OtcPromptingStrategy(PromptingStrategy):
         context_code = self.create_context_code(prompting_context)
 
         exemplary_otc_sequences = "\n\n".join(
-            f"Exemplar {idx + 1}:\n{self.create_otc_sequences(cycle)}"
-            for idx, cycle in enumerate(exemplars)
+            f"Exemplar {idx + 1}:\n{''.join(self.create_otc_sequence(cycle) for cycle in exemplar.cycles)}"
+            for idx, exemplar in enumerate(exemplars)
         )
 
-        current_otc_sequences = "\n".join(map(self.create_otc_sequences, cycles))
+        current_otc_sequences = "\n".join(map(self.create_otc_sequence, cycles))
 
         return LlmMessage(
             text=OTC_PROMPT_TEMPLATE.format(
@@ -127,7 +127,7 @@ class OtcPromptingStrategy(PromptingStrategy):
         code_stub = CodeStub.from_context(context)
         return code_stub.generate()
 
-    def create_otc_sequences(self, cycle: ChatCycle) -> str:
+    def create_otc_sequence(self, cycle: ChatCycle) -> str:
         sequences = []
         observation = self.create_observation_from_request(cycle.request)
 
@@ -141,8 +141,9 @@ class OtcPromptingStrategy(PromptingStrategy):
             executed_blocks = filter(
                 lambda block: block.is_executed, prompt_cycle.blocks
             )
-            executed_commands = map(lambda block: block.generated_code, executed_blocks)
-            commands = "\n".join(executed_commands)
+            commands = "\n".join(
+                map(lambda block: block.generated_code, executed_blocks)
+            )
 
             sequences.append(
                 COMPLETE_OTC_SEQUENCE_TEMPLATE.format(
@@ -164,7 +165,7 @@ class OtcPromptingStrategy(PromptingStrategy):
 
     def create_observation_from_request(self, request: ContextualizedMessage) -> str:
         if not request.paths:
-            return REQUEST_OBSERVATION_TEMPLATE.format(text=request.paths)
+            return REQUEST_OBSERVATION_TEMPLATE.format(text=request.text)
 
         return REQUEST_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE.format(
             text=request.text, attachments=f'[{", ".join(request.paths)}]'

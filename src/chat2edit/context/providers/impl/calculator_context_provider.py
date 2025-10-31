@@ -106,8 +106,8 @@ class CalculatorContextProvider(ContextProvider):
                                 ],
                                 blocks=[
                                     ExecutionBlock(
-                                        generated_code="radians = math.radians(57)\nresult = math.cos(radians)",
-                                        processed_code="radians = math.radians(57)\nresult = math.cos(radians)",
+                                        generated_code="radians = math.radians(57)",
+                                        processed_code="radians = math.radians(57)",
                                         is_executed=True,
                                     ),
                                     ExecutionBlock(

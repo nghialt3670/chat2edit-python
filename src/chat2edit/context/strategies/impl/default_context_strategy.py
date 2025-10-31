@@ -21,7 +21,7 @@ class DefaultContextStrategy(ContextStrategy):
     ) -> ContextualizedMessage:
         return ContextualizedMessage(
             text=message.text,
-            attachments=self.assign_attachments(message.attachments, context),
+            attachments=self._assign_attachments(message.attachments, context),
         )
 
     def contextualize_feedback(
@@ -29,7 +29,7 @@ class DefaultContextStrategy(ContextStrategy):
     ) -> ContextualizedFeedback:
         return ContextualizedFeedback(
             text=feedback.text,
-            attachments=self.assign_attachments(feedback.attachments, context),
+            attachments=self._assign_attachments(feedback.attachments, context),
         )
 
     def decontextualize_message(
