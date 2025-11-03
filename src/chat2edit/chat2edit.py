@@ -85,7 +85,11 @@ class Chat2Edit:
             ):
                 break
 
-        return self._get_response(chat_cycle, context), chat_cycle, context
+        return (
+            self._get_response(chat_cycle, context),
+            chat_cycle,
+            self._context_strategy.filter_context(context),
+        )
 
     async def _prompt(
         self,

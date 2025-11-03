@@ -86,9 +86,15 @@ Unexpected error occurred:
 {message}
 """.strip()
 INCOMPLETE_CYCLE_FEEDBACK_TEXT = "The commands executed successfully. Please continue."
-EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, the following parameters are empty: {params_str}."
-MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, parameter lengths do not match: {params_str}."
-MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, all optional parameters are missing: {params_str}."
+EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = (
+    "In function `{function}`, the following parameters are empty: {params_str}."
+)
+MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = (
+    "In function `{function}`, parameter lengths do not match: {params_str}."
+)
+MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = (
+    "In function `{function}`, all optional parameters are missing: {params_str}."
+)
 
 
 class OtcPromptingStrategy(PromptingStrategy):
