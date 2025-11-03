@@ -2,9 +2,12 @@ import re
 from typing import Any, Dict, List, Tuple
 
 from chat2edit.execution.feedbacks import (
+    EmptyListParametersFeedback,
     IgnoredReturnValueFeedback,
     IncompleteCycleFeedback,
     InvalidParameterTypeFeedback,
+    MismatchListParametersFeedback,
+    MissingAllOptionalParametersFeedback,
     ModifiedAttachmentFeedback,
     UnexpectedErrorFeedback,
 )
@@ -83,6 +86,9 @@ Unexpected error occurred:
 {message}
 """.strip()
 INCOMPLETE_CYCLE_FEEDBACK_TEXT = "The commands executed successfully. Please continue."
+EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, the following parameters are empty: {params_str}."
+MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, parameter lengths do not match: {params_str}."
+MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE = "In function `{function}`, all optional parameters are missing: {params_str}."
 
 
 class OtcPromptingStrategy(PromptingStrategy):
@@ -216,6 +222,28 @@ class OtcPromptingStrategy(PromptingStrategy):
 
         elif isinstance(feedback, IncompleteCycleFeedback):
             return INCOMPLETE_CYCLE_FEEDBACK_TEXT
+
+        elif isinstance(feedback, EmptyListParametersFeedback):
+            params_str = ", ".join(feedback.parameters)
+            return EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
+                function=feedback.function, params_str=params_str
+            )
+
+        elif isinstance(feedback, MismatchListParametersFeedback):
+            params_with_lengths = [
+                f"{param} (length: {length})"
+                for param, length in zip(feedback.parameters, feedback.lengths)
+            ]
+            params_str = ", ".join(params_with_lengths)
+            return MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
+                function=feedback.function, params_str=params_str
+            )
+
+        elif isinstance(feedback, MissingAllOptionalParametersFeedback):
+            params_str = ", ".join(feedback.parameters)
+            return MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
+                function=feedback.function, params_str=params_str
+            )
 
         else:
             raise ValueError(f"Unknown feedback: {feedback}")
