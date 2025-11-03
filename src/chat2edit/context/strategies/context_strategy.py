@@ -11,6 +11,10 @@ from chat2edit.models import (
 
 class ContextStrategy(ABC):
     @abstractmethod
+    def filter_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
     def contextualize_message(
         self, message: ChatMessage, context: Dict[str, Any]
     ) -> ContextualizedMessage:

@@ -16,6 +16,9 @@ MAX_VARNAME_SEARCH_INDEX = 100
 
 
 class DefaultContextStrategy(ContextStrategy):
+    def filter_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return context
+
     def contextualize_message(
         self, message: ChatMessage, context: Dict[str, Any]
     ) -> ContextualizedMessage:
