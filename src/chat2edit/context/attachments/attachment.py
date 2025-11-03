@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Callable, Generic, Optional, Type, TypeVar
+from typing import Any, Generic, Optional, Type, TypeVar
 
 T = TypeVar("T")
 

@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from chat2edit.context.attachments import Attachment
 from chat2edit.models import Exemplar
 
 

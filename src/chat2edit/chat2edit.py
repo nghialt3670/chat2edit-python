@@ -10,6 +10,7 @@ from chat2edit.models import (
     ChatMessage,
     ContextualizedFeedback,
     ExecutionBlock,
+    ExecutionFeedback,
     PromptCycle,
     PromptExchange,
 )
@@ -32,56 +33,6 @@ class Chat2EditCallbacks(BaseModel):
     on_execute: Optional[Callable[[ExecutionBlock], None]] = Field(default=None)
 
 
-DEFAULT_CHAT2EDIT_CONFIG = Chat2EditConfig()
-
-
-def handle_request(request: ContextualizedFeedback) -> None:
-    print(f"--- Request ---")
-    print(f"- Text: {request.text}")
-    print(f"- Paths: {request.paths}")
-    print()
-
-
-def handle_prompt(prompt: LlmMessage) -> None:
-    print(f"--- Prompt ---")
-    print(f"{prompt.text}")
-    print()
-
-
-def handle_answers(answers: List[LlmMessage]) -> None:
-    print(f"--- Answers ---")
-    print(f"{answers[0].text}")
-    print()
-
-
-def handle_extract(code: str) -> None:
-    print(f"--- Code ---")
-    print(f"{code}")
-    print()
-
-
-def handle_blocks(blocks: List[ExecutionBlock]) -> None:
-    print(f"--- Blocks ---")
-    print("\n".join(block.generated_code for block in blocks))
-    print()
-
-
-def handle_execute(block: ExecutionBlock) -> None:
-    print(f"--- Execute ---")
-    print(f"{block.generated_code}")
-    print()
-
-
-DEFAULT_CHAT2EDIT_CALLBACKS = Chat2EditCallbacks(
-    on_request=handle_request,
-    on_prompt=handle_prompt,
-    on_answers=handle_answers,
-    on_extract=handle_extract,
-    on_blocks=handle_blocks,
-    on_execute=handle_execute,
-)
-
-
 class Chat2Edit:
     def __init__(
         self,
@@ -91,8 +42,8 @@ class Chat2Edit:
         context_strategy: ContextStrategy = DefaultContextStrategy(),
         prompting_strategy: PromptingStrategy = OtcPromptingStrategy(),
         execution_strategy: ExecutionStrategy = DefaultExecutionStrategy(),
-        callbacks: Chat2EditCallbacks = DEFAULT_CHAT2EDIT_CALLBACKS,
-        config: Chat2EditConfig = DEFAULT_CHAT2EDIT_CONFIG,
+        callbacks: Chat2EditCallbacks = Chat2EditCallbacks(),
+        config: Chat2EditConfig = Chat2EditConfig(),
     ) -> None:
         self._llm = llm
         self._context_provider = context_provider
@@ -202,9 +153,13 @@ class Chat2Edit:
             )
             block.is_executed = True
             block.feedback = (
-                self._context_strategy.contextualize_feedback(feedback, context)
-                if feedback
-                else None
+                None
+                if not feedback
+                else (
+                    self._context_strategy.contextualize_feedback(feedback, context)
+                    if isinstance(feedback, ExecutionFeedback)
+                    else feedback
+                )
             )
             block.response = (
                 self._context_strategy.contextualize_message(response, context)

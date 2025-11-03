@@ -1,8 +1,10 @@
+from typing import List
+
 from pydantic import Field
 
 from chat2edit.models import ContextualizedFeedback
 
 
-class IgnoredReturnValueFeedback(ContextualizedFeedback):
+class EmptyListParametersFeedback(ContextualizedFeedback):
     severity: str = Field(default="error")
-    value_type: str
+    parameters: List[str]

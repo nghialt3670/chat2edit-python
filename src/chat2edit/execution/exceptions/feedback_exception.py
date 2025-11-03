@@ -1,7 +1,11 @@
-from chat2edit.models import ExecutionFeedback
+from typing import Union
+
+from chat2edit.models import ContextualizedFeedback, ExecutionFeedback
 
 
 class FeedbackException(Exception):
-    def __init__(self, feedback: ExecutionFeedback) -> None:
+    def __init__(
+        self, feedback: Union[ExecutionFeedback, ContextualizedFeedback]
+    ) -> None:
         super().__init__()
         self.feedback = feedback
