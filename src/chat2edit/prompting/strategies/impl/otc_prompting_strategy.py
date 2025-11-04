@@ -1,4 +1,5 @@
 import re
+from sys import last_type
 from typing import Any, Dict, List, Tuple
 
 from chat2edit.execution.feedbacks import (
@@ -163,9 +164,10 @@ class OtcPromptingStrategy(PromptingStrategy):
                 )
             )
 
-            if prompt_cycle.blocks and prompt_cycle.blocks[-1].feedback:
+            last_executed_block = executed_blocks[-1]
+            if last_executed_block.feedback:
                 observation = self.create_observation_from_feedback(
-                    prompt_cycle.blocks[-1].feedback
+                    last_executed_block.feedback
                 )
 
         if not prompt_cycle.blocks or not prompt_cycle.blocks[-1].response:
