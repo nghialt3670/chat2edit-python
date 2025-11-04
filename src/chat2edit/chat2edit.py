@@ -12,11 +12,12 @@ from chat2edit.models import (
     ContextualizedFeedback,
     ExecutionBlock,
     ExecutionFeedback,
+    LlmMessage,
     PromptCycle,
     PromptExchange,
 )
 from chat2edit.models.prompt_error import PromptError
-from chat2edit.prompting.llms import GoogleLlm, Llm, LlmMessage
+from chat2edit.prompting.llms import GoogleLlm, Llm
 from chat2edit.prompting.strategies import OtcPromptingStrategy, PromptingStrategy
 
 

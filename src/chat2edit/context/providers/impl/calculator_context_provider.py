@@ -9,10 +9,10 @@ from chat2edit.models import (
     ContextualizedMessage,
     ExecutionBlock,
     Exemplar,
+    LlmMessage,
     PromptCycle,
     PromptExchange,
 )
-from chat2edit.models import LlmMessage
 
 
 @respond

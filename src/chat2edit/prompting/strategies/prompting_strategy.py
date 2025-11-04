@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from chat2edit.models import ChatCycle, Exemplar
-from chat2edit.models import LlmMessage
+from chat2edit.models import ChatCycle, Exemplar, LlmMessage
 
 
 class PromptingStrategy(ABC):
