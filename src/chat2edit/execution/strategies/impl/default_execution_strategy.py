@@ -66,7 +66,4 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         feedback = feedback or pop_feedback()
         response = response or pop_response()
 
-        if not (feedback or response or error):
-            feedback = IncompleteCycleFeedback()
-
         return feedback, response, error, logs

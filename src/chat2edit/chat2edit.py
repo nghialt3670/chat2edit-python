@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from chat2edit.context.providers import CalculatorContextProvider, ContextProvider
 from chat2edit.context.strategies import ContextStrategy, DefaultContextStrategy
+from chat2edit.execution.feedbacks import IncompleteCycleFeedback
 from chat2edit.execution.strategies import DefaultExecutionStrategy, ExecutionStrategy
 from chat2edit.models import (
     ChatCycle,
@@ -178,6 +179,15 @@ class Chat2Edit:
 
             if feedback or response or error:
                 break
+
+        executed_blocks = list(filter(lambda block: block.is_executed, blocks))
+        last_executed_block = executed_blocks[-1]
+        if not (
+            last_executed_block.feedback
+            or last_executed_block.response
+            or last_executed_block.error
+        ):
+            last_executed_block.feedback = IncompleteCycleFeedback()
 
         return blocks
 
