@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from chat2edit.models.prompt_error import PromptError
-from chat2edit.prompting.llms.llm_message import LlmMessage
+from chat2edit.models.llm_message import LlmMessage
 
 
 class PromptExchange(BaseModel):

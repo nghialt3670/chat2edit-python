@@ -12,7 +12,7 @@ from chat2edit.models import (
     PromptCycle,
     PromptExchange,
 )
-from chat2edit.prompting.llms import LlmMessage
+from chat2edit.models import LlmMessage
 
 
 @respond

@@ -3,8 +3,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import openai
 
+from chat2edit.models import LlmMessage
 from chat2edit.prompting.llms.llm import Llm
-from chat2edit.prompting.llms.llm_message import LlmMessage
 
 
 class OpenAILlm(Llm):

@@ -18,7 +18,7 @@ from chat2edit.models import (
     ContextualizedMessage,
     Exemplar,
 )
-from chat2edit.prompting.llms import LlmMessage
+from chat2edit.models import LlmMessage
 from chat2edit.prompting.strategies.prompting_strategy import PromptingStrategy
 from chat2edit.prompting.stubbing.stubs import CodeStub
 
