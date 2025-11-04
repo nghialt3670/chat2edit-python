@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from IPython.core.interactiveshell import InteractiveShell
 
 from chat2edit.execution.exceptions import FeedbackException, ResponseException
-from chat2edit.execution.feedbacks import IncompleteCycleFeedback
 from chat2edit.execution.signaling import pop_feedback, pop_response
 from chat2edit.execution.strategies.execution_strategy import ExecutionStrategy
 from chat2edit.execution.utils import fix_unawaited_async_calls

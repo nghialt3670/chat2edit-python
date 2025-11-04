@@ -1,5 +1,4 @@
 import re
-from sys import last_type
 from typing import Any, Dict, List, Tuple
 
 from chat2edit.execution.feedbacks import (
