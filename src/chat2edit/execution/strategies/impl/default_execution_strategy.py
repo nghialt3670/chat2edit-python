@@ -1,4 +1,5 @@
 import ast
+import textwrap
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from typing import Any, Dict, List, Optional, Tuple
@@ -15,7 +16,8 @@ from chat2edit.models import ChatMessage, ExecutionError, ExecutionFeedback
 
 class DefaultExecutionStrategy(ExecutionStrategy):
     def parse(self, code: str) -> List[str]:
-        tree = ast.parse(code)
+        dedented_code = textwrap.dedent(code)
+        tree = ast.parse(dedented_code)
         return [ast.unparse(node).strip() for node in tree.body]
 
     def process(self, code: str, context: Dict[str, Any]) -> str:
