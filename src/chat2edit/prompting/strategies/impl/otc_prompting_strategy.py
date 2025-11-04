@@ -150,9 +150,9 @@ class OtcPromptingStrategy(PromptingStrategy):
             answer = prompt_cycle.exchanges[-1].answers[0]
             thinking, _ = self.extract_thinking_commands(answer.text)
 
-            executed_blocks = filter(
+            executed_blocks = list(filter(
                 lambda block: block.is_executed, prompt_cycle.blocks
-            )
+            ))
             commands = "\n".join(
                 map(lambda block: block.generated_code, executed_blocks)
             )
