@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 
-from chat2edit.prompting.llms.llm_message import LlmMessage
+from chat2edit.models import LlmMessage
 
 
 class Llm(ABC):

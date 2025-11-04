@@ -316,8 +316,8 @@ package "Stubbing" {
 ' Inheritance
 TimestampedModel <|-- Message
 TimestampedModel <|-- Error
-TimestampedModel <|-- LlmMessage
-Message <|-- Feedback
+TimestampedModel <|-- Feedback
+Message <|-- LlmMessage
 Message <|-- ChatMessage
 Message <|-- ContextualizedMessage
 Feedback <|-- ExecutionFeedback
