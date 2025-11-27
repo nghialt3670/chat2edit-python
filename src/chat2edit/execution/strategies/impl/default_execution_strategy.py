@@ -1,4 +1,5 @@
 import ast
+import re
 import textwrap
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -11,6 +12,14 @@ from chat2edit.execution.signaling import pop_feedback, pop_response
 from chat2edit.execution.strategies.execution_strategy import ExecutionStrategy
 from chat2edit.execution.utils import fix_unawaited_async_calls
 from chat2edit.models import ChatMessage, ExecutionError, ExecutionFeedback
+
+
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    # Pattern to match ANSI escape sequences
+    # Matches: \x1b[...m or \033[...m or \x1b[K (clear line) etc.
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\[K|\033\[[0-9;]*[a-zA-Z]|\033\[K')
+    return ansi_escape.sub('', text)
 
 
 class DefaultExecutionStrategy(ExecutionStrategy):
@@ -60,7 +69,9 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         except Exception as e:
             error = ExecutionError.from_exception(e)
         finally:
-            logs = [line for line in log_buffer.getvalue().splitlines() if line]
+            # Strip ANSI escape codes from logs before processing
+            log_text = strip_ansi_codes(log_buffer.getvalue())
+            logs = [line for line in log_text.splitlines() if line]
 
         feedback = feedback or pop_feedback()
         response = response or pop_response()
