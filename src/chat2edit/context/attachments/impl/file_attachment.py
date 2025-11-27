@@ -1,4 +1,5 @@
 import inspect
+from copy import deepcopy
 from typing import Any, Callable, Optional, TypeVar
 
 from chat2edit.context.attachments.attachment import Attachment
@@ -45,3 +46,10 @@ class FileAttachment(Attachment):
             self._handle_modification(name)
 
         super().__setattr__(name, value)
+
+    def __deepcopy__(self, memo: Any) -> "FileAttachment":
+        return FileAttachment(
+            deepcopy(self.__obj__, memo),
+            basename=self.__basename__,
+            filename=self.__filename__,
+        )

@@ -68,6 +68,4 @@ class Attachment(Generic[T]):
         return Attachment(
             deepcopy(self.__obj__, memo),
             basename=self.__basename__,
-            filename=self.__filename__,
-            modifiable=True,
         )
