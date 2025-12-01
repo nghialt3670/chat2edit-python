@@ -58,9 +58,13 @@ class Chat2Edit:
     async def generate(
         self,
         request: ChatMessage,
-        cycles: List[ChatCycle] = [],
-        context: Dict[str, Any] = {},
+        cycles: Optional[List[ChatCycle]] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Optional[ChatMessage], ChatCycle, Dict[str, Any]]:
+        # Avoid sharing mutable default arguments across invocations by creating fresh copies
+        cycles = list(cycles) if cycles is not None else []
+        context = dict(context) if context is not None else {}
+
         context.update(self._context_provider.get_context())
         contextualized_request = self._context_strategy.contextualize_message(
             request, context
@@ -82,8 +86,9 @@ class Chat2Edit:
             code = prompt_cycle.exchanges[-1].code
             prompt_cycle.blocks = await self._execute(code, context)
 
-            if prompt_cycle.blocks and (
-                prompt_cycle.blocks[-1].response or prompt_cycle.blocks[-1].error
+            executed_blocks = list(filter(lambda block: block.is_executed, prompt_cycle.blocks))
+            if executed_blocks and (
+                executed_blocks[-1].response or executed_blocks[-1].error
             ):
                 break
 
