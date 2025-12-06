@@ -2,10 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from chat2edit.models import (
-    ChatMessage,
-    ContextualizedFeedback,
     ExecutionError,
-    ExecutionFeedback,
+    Feedback,
+    Message,
 )
 
 
@@ -21,8 +20,8 @@ class ExecutionStrategy(ABC):
     @abstractmethod
     async def execute(self, code: str, context: Dict[str, Any]) -> Tuple[
         Optional[ExecutionError],
-        Optional[Union[ExecutionFeedback, ContextualizedFeedback]],
-        Optional[ChatMessage],
+        Optional[Union[Feedback, Feedback]],
+        Optional[Message],
         List[str],
     ]:
         pass

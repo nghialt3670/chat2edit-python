@@ -1,13 +1,13 @@
-from typing import List, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from chat2edit.models.llm_message import LlmMessage
+from chat2edit.models.exemplary_prompt_exchange import ExemplaryPromptExchange
+from chat2edit.models.message import Message
 from chat2edit.models.prompt_error import PromptError
 
 
-class PromptExchange(BaseModel):
-    prompt: LlmMessage
-    answer: LlmMessage = Field(default=None)
+class PromptExchange(ExemplaryPromptExchange):
+    prompt: Message
     error: Optional[PromptError] = Field(default=None)
     code: Optional[str] = Field(default=None)

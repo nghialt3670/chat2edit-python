@@ -8,12 +8,10 @@ from chat2edit.execution.feedbacks import IncompleteCycleFeedback
 from chat2edit.execution.strategies import DefaultExecutionStrategy, ExecutionStrategy
 from chat2edit.models import (
     ChatCycle,
-    ChatMessage,
-    ContextualizedFeedback,
-    ContextualizedMessage,
     ExecutionBlock,
-    ExecutionFeedback,
-    LlmMessage,
+    Exemplar,
+    Feedback,
+    Message,
     PromptCycle,
     PromptExchange,
 )
@@ -28,9 +26,9 @@ class Chat2EditConfig(BaseModel):
 
 
 class Chat2EditCallbacks(BaseModel):
-    on_request: Optional[Callable[[ContextualizedMessage], None]] = Field(default=None)
-    on_prompt: Optional[Callable[[LlmMessage], None]] = Field(default=None)
-    on_answer: Optional[Callable[[LlmMessage], None]] = Field(default=None)
+    on_request: Optional[Callable[[Message], None]] = Field(default=None)
+    on_prompt: Optional[Callable[[Message], None]] = Field(default=None)
+    on_answer: Optional[Callable[[Message], None]] = Field(default=None)
     on_extract: Optional[Callable[[str], None]] = Field(default=None)
     on_execute: Optional[Callable[[ExecutionBlock], None]] = Field(default=None)
 
@@ -54,21 +52,22 @@ class Chat2Edit:
         self._execution_strategy = execution_strategy
         self._callbacks = callbacks
         self._config = config
+        self._exemplars = self._context_strategy.contextualize_exemplar(
+            self._context_provider.get_exemplars(), {}
+        )
 
     async def generate(
         self,
-        request: ChatMessage,
+        request: Message,
         cycles: Optional[List[ChatCycle]] = None,
         context: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[Optional[ChatMessage], ChatCycle, Dict[str, Any]]:
+    ) -> Tuple[Optional[Message], ChatCycle, Dict[str, Any]]:
         # Avoid sharing mutable default arguments across invocations by creating fresh copies
         cycles = list(cycles) if cycles is not None else []
         context = dict(context) if context is not None else {}
 
         context.update(self._context_provider.get_context())
-        contextualized_request = self._context_strategy.contextualize_message(
-            request, context
-        )
+        contextualized_request = self._context_strategy.contextualize_message(request, context)
         chat_cycle = ChatCycle(request=contextualized_request)
         cycles.append(chat_cycle)
 
@@ -87,9 +86,7 @@ class Chat2Edit:
             prompt_cycle.blocks = await self._execute(code, context)
 
             executed_blocks = list(filter(lambda block: block.executed, prompt_cycle.blocks))
-            if executed_blocks and (
-                executed_blocks[-1].response or executed_blocks[-1].error
-            ):
+            if executed_blocks and (executed_blocks[-1].response or executed_blocks[-1].error):
                 break
 
         return (
@@ -102,7 +99,6 @@ class Chat2Edit:
         self,
         cycles: List[ChatCycle],
     ) -> PromptCycle:
-        exemplars = self._context_provider.get_exemplars()
         context = self._context_provider.get_context()
         exchanges = []
 
@@ -110,7 +106,7 @@ class Chat2Edit:
             prompt = (
                 self._prompting_strategy.get_refine_prompt()
                 if exchanges
-                else self._prompting_strategy.create_prompt(cycles, exemplars, context)
+                else self._prompting_strategy.create_prompt(cycles, self._exemplars, context)
             )
             exchange = PromptExchange(prompt=prompt)
             exchanges.append(exchange)
@@ -144,14 +140,11 @@ class Chat2Edit:
     async def _execute(self, code: str, context: Dict[str, Any]) -> List[str]:
         generated_code_blocks = self._execution_strategy.parse(code)
         processed_code_blocks = [
-            self._execution_strategy.process(block, context)
-            for block in generated_code_blocks
+            self._execution_strategy.process(block, context) for block in generated_code_blocks
         ]
         blocks = [
             ExecutionBlock(generated_code=generated_code, processed_code=processed_code)
-            for generated_code, processed_code in zip(
-                generated_code_blocks, processed_code_blocks
-            )
+            for generated_code, processed_code in zip(generated_code_blocks, processed_code_blocks)
         ]
 
         for block in blocks:
@@ -164,7 +157,7 @@ class Chat2Edit:
                 if not feedback
                 else (
                     self._context_strategy.contextualize_feedback(feedback, context)
-                    if isinstance(feedback, ExecutionFeedback)
+                    if isinstance(feedback, Feedback)
                     else feedback
                 )
             )
@@ -193,9 +186,7 @@ class Chat2Edit:
 
         return blocks
 
-    def _get_response(
-        self, chat_cycle: ChatCycle, context: Dict[str, Any]
-    ) -> Optional[ChatMessage]:
+    def _get_response(self, chat_cycle: ChatCycle, context: Dict[str, Any]) -> Optional[Message]:
         if not chat_cycle.cycles:
             return None
 
@@ -203,9 +194,7 @@ class Chat2Edit:
         if not last_prompt_cycle.blocks:
             return None
 
-        executed_blocks = list(
-            filter(lambda block: block.executed, last_prompt_cycle.blocks)
-        )
+        executed_blocks = list(filter(lambda block: block.executed, last_prompt_cycle.blocks))
         if not executed_blocks:
             return None
 
@@ -213,6 +202,34 @@ class Chat2Edit:
         if not last_executed_block.response:
             return None
 
-        return self._context_strategy.decontextualize_message(
-            last_executed_block.response, context
-        )
+        return self._context_strategy.decontextualize_message(last_executed_block.response, context)
+
+    def _contextualize_exemplar(self, exemplar: Exemplar) -> Exemplar:
+        context = self._context_provider.get_context()
+
+        for chat_cycle in exemplar.cycles:
+            if not chat_cycle.request.contextualized:
+                chat_cycle.request = self._context_strategy.contextualize_message(
+                    chat_cycle.request, context
+                )
+                chat_cycle.request.contextualized = True
+            for prompt_cycle in chat_cycle.cycles:
+                for exchange in prompt_cycle.exchanges:
+                    if not exchange.answer.contextualized:
+                        exchange.answer = self._context_strategy.contextualize_message(
+                            exchange.answer, context
+                        )
+                        exchange.answer.contextualized = True
+                for block in prompt_cycle.blocks:
+                    if block.feedback and not block.feedback.contextualized:
+                        block.feedback = self._context_strategy.contextualize_feedback(
+                            block.feedback, context
+                        )
+                        block.feedback.contextualized = True
+                    if block.response and not block.response.contextualized:
+                        block.response = self._context_strategy.contextualize_message(
+                            block.response, context
+                        )
+                        block.response.contextualized = True
+
+        return exemplar

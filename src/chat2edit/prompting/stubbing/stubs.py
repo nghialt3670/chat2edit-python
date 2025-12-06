@@ -49,8 +49,7 @@ class ImportInfo:
     @classmethod
     def from_node(cls, node: ImportNodeType) -> "ImportInfo":
         names = [
-            (name.name, ast.unparse(name.asname) if name.asname else None)
-            for name in node.names
+            (name.name, ast.unparse(name.asname) if name.asname else None) for name in node.names
         ]
 
         if isinstance(node, ast.Import):
@@ -245,9 +244,7 @@ class ClassStub:
         name = self.clss.__name__ if self.clss else self.name
         bases = set(self.bases)
         docstring = (
-            None
-            if self.clss and hasattr(self.clss, DOCSTRING_EXCLUDED_KEY)
-            else self.docstring
+            None if self.clss and hasattr(self.clss, DOCSTRING_EXCLUDED_KEY) else self.docstring
         )
         attr_names = set(attr.target for attr in self.attributes)
         method_names = set(method.name for method in self.methods)
@@ -441,9 +438,7 @@ class CodeStub:
             for k, v in self.mappings.items():
                 stub = stub.replace(k, v)
 
-        return black.format_str(
-            stub, mode=black.Mode(line_length=1000, is_pyi=True)
-        ).strip()
+        return black.format_str(stub, mode=black.Mode(line_length=1000, is_pyi=True)).strip()
 
     def __repr__(self) -> str:
         return self.generate()

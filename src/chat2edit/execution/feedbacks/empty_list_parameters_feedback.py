@@ -2,9 +2,9 @@ from typing import List
 
 from pydantic import Field
 
-from chat2edit.models import ContextualizedFeedback
+from chat2edit.models import Feedback
 
 
-class EmptyListParametersFeedback(ContextualizedFeedback):
+class EmptyListParametersFeedback(Feedback):
     severity: str = Field(default="error")
     parameters: List[str]

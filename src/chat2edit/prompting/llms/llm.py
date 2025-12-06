@@ -1,14 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 
-from chat2edit.models import LlmMessage
+from chat2edit.models import Message
 
 
 class Llm(ABC):
     @abstractmethod
-    async def generate(
-        self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> LlmMessage:
+    async def generate(self, prompt: Message, history: List[Tuple[Message, Message]]) -> Message:
         pass
 
     @abstractmethod

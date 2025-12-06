@@ -187,9 +187,7 @@ def attribute_aliases(
 
 
 @exclude_this_decorator_factory
-def method_aliases(
-    attr_to_alias: Dict[str, str], map_func: Optional[Callable[[str], str]] = None
-):
+def method_aliases(attr_to_alias: Dict[str, str], map_func: Optional[Callable[[str], str]] = None):
     alias_to_attr = {v: k for k, v in attr_to_alias.items()}
 
     def decorator(cls):

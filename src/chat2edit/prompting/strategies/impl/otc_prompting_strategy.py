@@ -13,10 +13,9 @@ from chat2edit.execution.feedbacks import (
 )
 from chat2edit.models import (
     ChatCycle,
-    ContextualizedFeedback,
-    ContextualizedMessage,
     Exemplar,
-    LlmMessage,
+    Feedback,
+    Message,
 )
 from chat2edit.prompting.strategies.prompting_strategy import PromptingStrategy
 from chat2edit.prompting.stubbing.stubs import CodeStub
@@ -42,9 +41,7 @@ Guidelines:
 """.strip()
 
 REQUEST_OBSERVATION_TEMPLATE = 'user_message("{text}")'
-REQUEST_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE = (
-    'user_message("{text}", attachments={attachments})'
-)
+REQUEST_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE = 'user_message("{text}", attachments={attachments})'
 
 FEEDBACK_OBSERVATION_TEMPLATE = 'system_{severity}("{text}")'
 FEEDBACK_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE = (
@@ -103,7 +100,7 @@ class OtcPromptingStrategy(PromptingStrategy):
         cycles: List[ChatCycle],
         exemplars: List[Exemplar],
         context: Dict[str, Any],
-    ) -> LlmMessage:
+    ) -> Message:
         prompting_context = self.filter_context(context)
         context_code = self.create_context_code(prompting_context)
 
@@ -114,7 +111,7 @@ class OtcPromptingStrategy(PromptingStrategy):
 
         current_otc_sequences = "\n".join(map(self.create_otc_sequence, cycles))
 
-        return LlmMessage(
+        return Message(
             text=OTC_PROMPT_TEMPLATE.format(
                 context_code=context_code,
                 exemplary_otc_sequences=exemplary_otc_sequences,
@@ -122,8 +119,8 @@ class OtcPromptingStrategy(PromptingStrategy):
             )
         )
 
-    def get_refine_prompt(self) -> LlmMessage:
-        return LlmMessage(text=OTC_REFINE_PROMPT)
+    def get_refine_prompt(self) -> Message:
+        return Message(text=OTC_REFINE_PROMPT)
 
     def extract_code(self, text: str) -> str:
         try:
@@ -150,12 +147,8 @@ class OtcPromptingStrategy(PromptingStrategy):
             answer = prompt_cycle.exchanges[-1].answer
             thinking, _ = self.extract_thinking_commands(answer.text)
 
-            executed_blocks = list(filter(
-                lambda block: block.executed, prompt_cycle.blocks
-            ))
-            commands = "\n".join(
-                map(lambda block: block.generated_code, executed_blocks)
-            )
+            executed_blocks = list(filter(lambda block: block.executed, prompt_cycle.blocks))
+            commands = "\n".join(map(lambda block: block.generated_code, executed_blocks))
 
             sequences.append(
                 COMPLETE_OTC_SEQUENCE_TEMPLATE.format(
@@ -165,18 +158,14 @@ class OtcPromptingStrategy(PromptingStrategy):
 
             last_executed_block = executed_blocks[-1]
             if last_executed_block.feedback:
-                observation = self.create_observation_from_feedback(
-                    last_executed_block.feedback
-                )
+                observation = self.create_observation_from_feedback(last_executed_block.feedback)
 
         if not prompt_cycle.blocks or not prompt_cycle.blocks[-1].response:
-            sequences.append(
-                INCOMPLETE_OTC_SEQUENCE_TEMPLATE.format(observation=observation)
-            )
+            sequences.append(INCOMPLETE_OTC_SEQUENCE_TEMPLATE.format(observation=observation))
 
         return "\n".join(sequences)
 
-    def create_observation_from_request(self, request: ContextualizedMessage) -> str:
+    def create_observation_from_request(self, request: Message) -> str:
         if not request.paths:
             return REQUEST_OBSERVATION_TEMPLATE.format(text=request.text)
 
@@ -184,13 +173,11 @@ class OtcPromptingStrategy(PromptingStrategy):
             text=request.text, attachments=f'[{", ".join(request.paths)}]'
         )
 
-    def create_observation_from_feedback(self, feedback: ContextualizedFeedback) -> str:
+    def create_observation_from_feedback(self, feedback: Feedback) -> str:
         text = self.create_feedback_text(feedback)
 
         if not feedback.paths:
-            return FEEDBACK_OBSERVATION_TEMPLATE.format(
-                severity=feedback.severity, text=text
-            )
+            return FEEDBACK_OBSERVATION_TEMPLATE.format(severity=feedback.severity, text=text)
 
         return FEEDBACK_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE.format(
             severity=feedback.severity,
@@ -198,7 +185,7 @@ class OtcPromptingStrategy(PromptingStrategy):
             attachments=f'[{", ".join(feedback.paths)}]',
         )
 
-    def create_feedback_text(self, feedback: ContextualizedFeedback) -> str:
+    def create_feedback_text(self, feedback: Feedback) -> str:
         if isinstance(feedback, InvalidParameterTypeFeedback):
             return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function,
@@ -208,9 +195,7 @@ class OtcPromptingStrategy(PromptingStrategy):
             )
 
         elif isinstance(feedback, ModifiedAttachmentFeedback):
-            return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(
-                variable=feedback.variable
-            )
+            return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(variable=feedback.variable)
 
         elif isinstance(feedback, IgnoredReturnValueFeedback):
             return IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
@@ -266,8 +251,6 @@ class OtcPromptingStrategy(PromptingStrategy):
         ]
 
         thinking = parts[-2]
-        commands = (
-            re.search(r"```python(.*?)```", parts[-1], re.DOTALL).group(1).strip()
-        )
+        commands = re.search(r"```python(.*?)```", parts[-1], re.DOTALL).group(1).strip()
 
         return thinking, commands

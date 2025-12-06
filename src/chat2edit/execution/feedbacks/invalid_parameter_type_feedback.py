@@ -1,9 +1,9 @@
 from pydantic import Field
 
-from chat2edit.models import ContextualizedFeedback
+from chat2edit.models import Feedback
 
 
-class InvalidParameterTypeFeedback(ContextualizedFeedback):
+class InvalidParameterTypeFeedback(Feedback):
     severity: str = Field(default="error")
     parameter: str
     expected_type: str

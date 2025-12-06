@@ -1,8 +1,8 @@
 from pydantic import Field
 
-from chat2edit.models import ContextualizedFeedback, ExecutionError
+from chat2edit.models import ExecutionError, Feedback
 
 
-class UnexpectedErrorFeedback(ContextualizedFeedback):
+class UnexpectedErrorFeedback(Feedback):
     severity: str = Field(default="error")
     error: ExecutionError

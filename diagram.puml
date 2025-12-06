@@ -84,7 +84,7 @@ package "Models" {
         + function: str
     }
 
-    class ChatMessage {
+    class Message {
         + attachments: List
     }
 
@@ -92,11 +92,11 @@ package "Models" {
         + paths: List
     }
 
-    class ExecutionFeedback {
+    class Feedback {
         + attachments: List
     }
 
-    class ContextualizedFeedback {
+    class Feedback {
         + paths: List
     }
 
@@ -133,7 +133,7 @@ package "Models" {
         + generated_code: str
         + processed_code: str
         + executed: bool
-        + feedback: ContextualizedFeedback
+        + feedback: Feedback
         + response: ContextualizedMessage
         + error: ExecutionError
         + logs: List
@@ -317,18 +317,18 @@ TimestampedModel <|-- Message
 TimestampedModel <|-- Error
 TimestampedModel <|-- Feedback
 Message <|-- LlmMessage
-Message <|-- ChatMessage
+Message <|-- Message
 Message <|-- ContextualizedMessage
-Feedback <|-- ExecutionFeedback
-Feedback <|-- ContextualizedFeedback
+Feedback <|-- Feedback
+Feedback <|-- Feedback
 Error <|-- ExecutionError
 Error <|-- PromptError
 
-ContextualizedFeedback <|-- InvalidParameterTypeFeedback
-ContextualizedFeedback <|-- ModifiedAttachmentFeedback
-ContextualizedFeedback <|-- IgnoredReturnValueFeedback
-ContextualizedFeedback <|-- UnexpectedErrorFeedback
-ContextualizedFeedback <|-- IncompleteCycleFeedback
+Feedback <|-- InvalidParameterTypeFeedback
+Feedback <|-- ModifiedAttachmentFeedback
+Feedback <|-- IgnoredReturnValueFeedback
+Feedback <|-- UnexpectedErrorFeedback
+Feedback <|-- IncompleteCycleFeedback
 
 ContextProvider <|.. CalculatorContextProvider
 ContextStrategy <|.. DefaultContextStrategy
@@ -355,15 +355,15 @@ ChatCycle *-- PromptCycle
 PromptCycle *-- PromptExchange
 PromptCycle *-- ExecutionBlock
 PromptExchange *-- LlmMessage
-ExecutionBlock o-- ContextualizedFeedback
+ExecutionBlock o-- Feedback
 ExecutionBlock o-- ContextualizedMessage
 
 ClassStub *-- AssignInfo
 ClassStub *-- FunctionStub
 CodeStub *-- ImportInfo
 
-FeedbackException *-- ExecutionFeedback
-ResponseException *-- ChatMessage
+FeedbackException *-- Feedback
+ResponseException *-- Message
 UnexpectedErrorFeedback *-- ExecutionError
 
 ' Usage

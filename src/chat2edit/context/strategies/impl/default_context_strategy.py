@@ -5,10 +5,8 @@ from chat2edit.context.attachments import Attachment
 from chat2edit.context.strategies.context_strategy import ContextStrategy
 from chat2edit.context.utils import path_to_value
 from chat2edit.models import (
-    ChatMessage,
-    ContextualizedFeedback,
-    ContextualizedMessage,
-    ExecutionFeedback,
+    Feedback,
+    Message,
 )
 from chat2edit.utils import to_snake_case
 
@@ -19,28 +17,25 @@ class DefaultContextStrategy(ContextStrategy):
     def filter_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         return context
 
-    def contextualize_message(
-        self, message: ChatMessage, context: Dict[str, Any]
-    ) -> ContextualizedMessage:
-        return ContextualizedMessage(
+    def contextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
+        return Message(
             text=message.text,
             attachments=self._assign_attachments(message.attachments, context),
+            contextualized=True,
         )
 
-    def contextualize_feedback(
-        self, feedback: ExecutionFeedback, context: Dict[str, Any]
-    ) -> ContextualizedFeedback:
-        return ContextualizedFeedback(
+    def contextualize_feedback(self, feedback: Feedback, context: Dict[str, Any]) -> Feedback:
+        return Feedback(
             text=feedback.text,
             attachments=self._assign_attachments(feedback.attachments, context),
+            contextualized=True,
         )
 
-    def decontextualize_message(
-        self, message: ContextualizedMessage, context: Dict[str, Any]
-    ) -> ChatMessage:
-        return ChatMessage(
+    def decontextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
+        return Message(
             text=message.text,
             attachments=[path_to_value(path, context) for path in message.paths],
+            contextualized=False,
         )
 
     def _assign_attachments(
@@ -64,9 +59,7 @@ class DefaultContextStrategy(ContextStrategy):
             else to_snake_case(type(attachment).__name__).split("_").pop()
         )
 
-    def _find_suitable_varname(
-        self, attachment: Attachment, existing_varnames: Set[str]
-    ) -> str:
+    def _find_suitable_varname(self, attachment: Attachment, existing_varnames: Set[str]) -> str:
         basename = self._get_attachment_basename(attachment)
 
         i = 0

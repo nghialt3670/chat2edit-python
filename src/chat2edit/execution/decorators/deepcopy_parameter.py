@@ -15,10 +15,7 @@ def deepcopy_parameter(param: str) -> Callable:
             if param in params:
                 index = params.index(param)
                 if index < len(args):
-                    args = tuple(
-                        deepcopy(arg) if i == index else arg
-                        for i, arg in enumerate(args)
-                    )
+                    args = tuple(deepcopy(arg) if i == index else arg for i, arg in enumerate(args))
 
             if param in kwargs:
                 kwargs[param] = deepcopy(kwargs[param])

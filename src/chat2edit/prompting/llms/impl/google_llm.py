@@ -4,7 +4,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import google.generativeai as genai
 from google.generativeai import GenerationConfig
 
-from chat2edit.models import LlmMessage
+from chat2edit.models import Message
 from chat2edit.prompting.llms.llm import Llm
 
 SAFETY_SETTINGS = [
@@ -56,13 +56,11 @@ class GoogleLlm(Llm):
     def set_api_key(self, api_key: str) -> None:
         genai.configure(api_key=api_key)
 
-    async def generate(
-        self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> LlmMessage:
+    async def generate(self, prompt: Message, history: List[Tuple[Message, Message]]) -> Message:
         input_history = self._create_input_history(history)
         chat_session = self._model.start_chat(history=input_history)
         response = await chat_session.send_message_async(prompt.text)
-        return LlmMessage(text=response.text)
+        return Message(text=response.text)
 
     def get_info(self) -> Dict[str, Any]:
         return {
@@ -75,9 +73,7 @@ class GoogleLlm(Llm):
             "top_k": self._generation_config.top_k,
         }
 
-    def _create_input_history(
-        self, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> List[Dict[str, str]]:
+    def _create_input_history(self, history: List[Tuple[Message, Message]]) -> List[Dict[str, str]]:
         history = []
 
         for p, a in history:

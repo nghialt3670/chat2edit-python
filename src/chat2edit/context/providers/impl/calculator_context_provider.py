@@ -4,19 +4,18 @@ from typing import Any, Dict, List
 from chat2edit.context.providers.context_provider import ContextProvider
 from chat2edit.execution.decorators import respond
 from chat2edit.models import (
-    ExemplaryChatCycle,
-    ChatMessage,
-    ExemplaryExecutionBlock,
     Exemplar,
-    LlmMessage,
+    ExemplaryChatCycle,
+    ExemplaryExecutionBlock,
     ExemplaryPromptCycle,
     ExemplaryPromptExchange,
+    Message,
 )
 
 
 @respond
 def respond_to_user(text: str, attachments: List[Any] = []) -> None:
-    return ChatMessage(text=text, attachments=attachments)
+    return Message(text=text, attachments=attachments)
 
 
 class CalculatorContextProvider(ContextProvider):
@@ -31,14 +30,14 @@ class CalculatorContextProvider(ContextProvider):
             Exemplar(
                 cycles=[
                     ExemplaryChatCycle(
-                        request=ChatMessage(
+                        request=Message(
                             text="What is the square root of 1296?",
                         ),
                         cycles=[
                             ExemplaryPromptCycle(
                                 exchanges=[
                                     ExemplaryPromptExchange(
-                                        answer=LlmMessage(
+                                        answer=Message(
                                             text="""
 thinking: I should use the math module to calculate the square root.
 commands:
@@ -56,7 +55,7 @@ respond_to_user(f"The square root of 1296 is {result}")
                                     ),
                                     ExemplaryExecutionBlock(
                                         generated_code='respond_to_user(f"The square root of 1296 is {result}")',
-                                        response=ChatMessage(
+                                        response=Message(
                                             text="The square root of 1296 is 36.",
                                         ),
                                     ),
@@ -69,14 +68,14 @@ respond_to_user(f"The square root of 1296 is {result}")
             Exemplar(
                 cycles=[
                     ExemplaryChatCycle(
-                        request=ChatMessage(
+                        request=Message(
                             text="What is the cosine of 57 degrees?",
                         ),
                         cycles=[
                             ExemplaryPromptCycle(
                                 exchanges=[
                                     ExemplaryPromptExchange(
-                                        answer=LlmMessage(
+                                        answer=Message(
                                             text="""
 thinking: I should use the math module to calculate the cosine.
 commands:
@@ -98,7 +97,7 @@ respond_to_user(f"The cosine of 57 degrees is {result}")
                                     ),
                                     ExemplaryExecutionBlock(
                                         generated_code='respond_to_user(f"The cosine of 57 degrees is {result}")',
-                                        response=ChatMessage(
+                                        response=Message(
                                             text="The cosine of 57 degrees is 0.5446390350150271.",
                                         ),
                                     ),

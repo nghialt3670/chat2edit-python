@@ -28,9 +28,7 @@ class FileAttachment(Attachment):
     def __modifiable__(self) -> bool:
         return self.__dict__["__modifiable__"]
 
-    def set_origin_modification_handler(
-        self, handler: Callable[[str, str], None]
-    ) -> None:
+    def set_origin_modification_handler(self, handler: Callable[[str, str], None]) -> None:
         self.__dict__["__origin_modification_handler__"] = handler
 
     def _handle_modification(self, member: str) -> None:

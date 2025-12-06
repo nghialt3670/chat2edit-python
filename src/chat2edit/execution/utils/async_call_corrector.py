@@ -14,9 +14,7 @@ class AsyncCallCorrector(ast.NodeTransformer):
         self.async_functions = set()
         self._collect_async_functions(context)
 
-    def _collect_async_functions(
-        self, obj: Any, prefix: str = "", visited: Set[int] = None
-    ):
+    def _collect_async_functions(self, obj: Any, prefix: str = "", visited: Set[int] = None):
         """
         Recursively collect all async functions/methods from an object and its attributes
         """
@@ -52,9 +50,7 @@ class AsyncCallCorrector(ast.NodeTransformer):
             # Get all attributes that we can examine
             if hasattr(obj, "__dict__"):
                 items = [
-                    (name, getattr(obj, name))
-                    for name in dir(obj)
-                    if not name.startswith("__")
+                    (name, getattr(obj, name)) for name in dir(obj) if not name.startswith("__")
                 ]
             else:
                 items = []
@@ -63,9 +59,7 @@ class AsyncCallCorrector(ast.NodeTransformer):
             if inspect.isclass(obj):
                 class_items = inspect.getmembers(obj)
                 items.extend(
-                    class_item
-                    for class_item in class_items
-                    if not class_item[0].startswith("__")
+                    class_item for class_item in class_items if not class_item[0].startswith("__")
                 )
 
             # Process each attribute

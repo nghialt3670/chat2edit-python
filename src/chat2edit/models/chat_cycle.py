@@ -2,10 +2,10 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from chat2edit.models.contextualized_message import ContextualizedMessage
+from chat2edit.models.message import Message
 from chat2edit.models.prompt_cycle import PromptCycle
 
 
 class ChatCycle(BaseModel):
-    request: ContextualizedMessage
+    request: Message
     cycles: List[PromptCycle] = Field(default_factory=list)

@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import openai
 
-from chat2edit.models import LlmMessage
+from chat2edit.models import Message
 from chat2edit.prompting.llms.llm import Llm
 
 
@@ -29,9 +29,7 @@ class OpenAILlm(Llm):
     def set_api_key(self, api_key: str) -> None:
         openai.api_key = api_key
 
-    async def generate(
-        self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> LlmMessage:
+    async def generate(self, prompt: Message, history: List[Tuple[Message, Message]]) -> Message:
         response = await openai.ChatCompletion.acreate(
             messages=self._create_messages(prompt, history),
             model=self._model,
@@ -41,7 +39,7 @@ class OpenAILlm(Llm):
             top_p=self._top_p,
         )
 
-        return LlmMessage(text=response.choices[0].message.content)
+        return Message(text=response.choices[0].message.content)
 
     def get_info(self) -> Dict[str, Any]:
         return {
@@ -54,7 +52,7 @@ class OpenAILlm(Llm):
         }
 
     def _create_messages(
-        self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
+        self, prompt: Message, history: List[Tuple[Message, Message]]
     ) -> List[Dict[str, str]]:
         messages = []
 

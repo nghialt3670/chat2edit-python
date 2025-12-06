@@ -66,23 +66,16 @@ def is_external_package(obj: Any) -> bool:
     # Check if it's in site-packages or dist-packages
     for path in sys.path:
         site_pkg_path = Path(path).resolve()
-        if "site-packages" in str(site_pkg_path) or "dist-packages" in str(
-            site_pkg_path
-        ):
+        if "site-packages" in str(site_pkg_path) or "dist-packages" in str(site_pkg_path):
             try:
-                if (
-                    site_pkg_path in module_path.parents
-                    or site_pkg_path == module_path.parent
-                ):
+                if site_pkg_path in module_path.parents or site_pkg_path == module_path.parent:
                     return True
             except (ValueError, OSError):
                 continue
 
     # Check if it's from the standard library
     # Standard library is usually in the Python installation directory
-    stdlib_paths = [
-        Path(p).resolve() for p in sys.path if "lib" in p and "site-packages" not in p
-    ]
+    stdlib_paths = [Path(p).resolve() for p in sys.path if "lib" in p and "site-packages" not in p]
     for stdlib_path in stdlib_paths:
         try:
             if stdlib_path in module_path.parents:
