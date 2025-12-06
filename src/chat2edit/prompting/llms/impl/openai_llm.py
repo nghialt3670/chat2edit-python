@@ -31,7 +31,7 @@ class OpenAILlm(Llm):
 
     async def generate(
         self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> List[LlmMessage]:
+    ) -> LlmMessage:
         response = await openai.ChatCompletion.acreate(
             messages=self._create_messages(prompt, history),
             model=self._model,
@@ -41,7 +41,7 @@ class OpenAILlm(Llm):
             top_p=self._top_p,
         )
 
-        return [LlmMessage(text=choice.message.content) for choice in response.choices]
+        return LlmMessage(text=response.choices[0].message.content)
 
     def get_info(self) -> Dict[str, Any]:
         return {

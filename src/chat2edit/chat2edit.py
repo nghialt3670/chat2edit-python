@@ -10,6 +10,7 @@ from chat2edit.models import (
     ChatCycle,
     ChatMessage,
     ContextualizedFeedback,
+    ContextualizedMessage,
     ExecutionBlock,
     ExecutionFeedback,
     LlmMessage,
@@ -27,11 +28,10 @@ class Chat2EditConfig(BaseModel):
 
 
 class Chat2EditCallbacks(BaseModel):
-    on_request: Optional[Callable[[ContextualizedFeedback], None]] = Field(default=None)
+    on_request: Optional[Callable[[ContextualizedMessage], None]] = Field(default=None)
     on_prompt: Optional[Callable[[LlmMessage], None]] = Field(default=None)
-    on_answers: Optional[Callable[[List[LlmMessage]], None]] = Field(default=None)
+    on_answer: Optional[Callable[[LlmMessage], None]] = Field(default=None)
     on_extract: Optional[Callable[[str], None]] = Field(default=None)
-    on_blocks: Optional[Callable[List[ExecutionBlock], None]] = Field(default=None)
     on_execute: Optional[Callable[[ExecutionBlock], None]] = Field(default=None)
 
 
@@ -86,7 +86,7 @@ class Chat2Edit:
             code = prompt_cycle.exchanges[-1].code
             prompt_cycle.blocks = await self._execute(code, context)
 
-            executed_blocks = list(filter(lambda block: block.is_executed, prompt_cycle.blocks))
+            executed_blocks = list(filter(lambda block: block.executed, prompt_cycle.blocks))
             if executed_blocks and (
                 executed_blocks[-1].response or executed_blocks[-1].error
             ):
@@ -119,11 +119,11 @@ class Chat2Edit:
                 self._callbacks.on_prompt(exchange.prompt)
 
             try:
-                history = [[e.prompt, e.answers[0]] for e in exchanges[:-1]]
-                exchange.answers = await self._llm.generate(exchange.prompt, history)
+                history = [[e.prompt, e.answer] for e in exchanges[:-1]]
+                exchange.answer = await self._llm.generate(exchange.prompt, history)
 
-                if self._callbacks.on_answers:
-                    self._callbacks.on_answers(exchange.answers)
+                if self._callbacks.on_answer:
+                    self._callbacks.on_answer(exchange.answer)
 
             except Exception as e:
                 error = PromptError.from_exception(e)
@@ -131,8 +131,7 @@ class Chat2Edit:
                 exchange.error = error
                 break
 
-            answer = exchange.answers[0]
-            exchange.code = self._prompting_strategy.extract_code(answer.text)
+            exchange.code = self._prompting_strategy.extract_code(exchange.answer.text)
 
             if exchange.code:
                 if self._callbacks.on_extract:
@@ -155,14 +154,11 @@ class Chat2Edit:
             )
         ]
 
-        if self._callbacks.on_blocks:
-            self._callbacks.on_blocks(blocks)
-
         for block in blocks:
             feedback, response, error, logs = await self._execution_strategy.execute(
                 block.processed_code, context
             )
-            block.is_executed = True
+            block.executed = True
             block.feedback = (
                 None
                 if not feedback
@@ -186,7 +182,7 @@ class Chat2Edit:
             if feedback or response or error:
                 break
 
-        executed_blocks = list(filter(lambda block: block.is_executed, blocks))
+        executed_blocks = list(filter(lambda block: block.executed, blocks))
         last_executed_block = executed_blocks[-1]
         if not (
             last_executed_block.feedback
@@ -208,7 +204,7 @@ class Chat2Edit:
             return None
 
         executed_blocks = list(
-            filter(lambda block: block.is_executed, last_prompt_cycle.blocks)
+            filter(lambda block: block.executed, last_prompt_cycle.blocks)
         )
         if not executed_blocks:
             return None

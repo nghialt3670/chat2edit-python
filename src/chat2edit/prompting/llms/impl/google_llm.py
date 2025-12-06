@@ -58,11 +58,11 @@ class GoogleLlm(Llm):
 
     async def generate(
         self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> List[LlmMessage]:
+    ) -> LlmMessage:
         input_history = self._create_input_history(history)
         chat_session = self._model.start_chat(history=input_history)
         response = await chat_session.send_message_async(prompt.text)
-        return [LlmMessage(text=response.text)]
+        return LlmMessage(text=response.text)
 
     def get_info(self) -> Dict[str, Any]:
         return {

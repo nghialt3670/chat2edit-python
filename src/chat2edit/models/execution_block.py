@@ -10,7 +10,7 @@ from chat2edit.models.execution_error import ExecutionError
 class ExecutionBlock(BaseModel):
     generated_code: str
     processed_code: str
-    is_executed: bool = Field(default=False)
+    executed: bool = Field(default=False)
     feedback: Optional[ContextualizedFeedback] = Field(default=None)
     response: Optional[ContextualizedMessage] = Field(default=None)
     error: Optional[ExecutionError] = Field(default=None)

@@ -8,7 +8,7 @@ class Llm(ABC):
     @abstractmethod
     async def generate(
         self, prompt: LlmMessage, history: List[Tuple[LlmMessage, LlmMessage]]
-    ) -> List[LlmMessage]:
+    ) -> LlmMessage:
         pass
 
     @abstractmethod

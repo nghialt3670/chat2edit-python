@@ -8,6 +8,6 @@ from chat2edit.models.prompt_error import PromptError
 
 class PromptExchange(BaseModel):
     prompt: LlmMessage
-    answers: List[LlmMessage] = Field(default_factory=list)
+    answer: LlmMessage = Field(default=None)
     error: Optional[PromptError] = Field(default=None)
     code: Optional[str] = Field(default=None)

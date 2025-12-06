@@ -29,9 +29,8 @@ package "Core" {
     class Chat2EditCallbacks {
         + on_request: Callable
         + on_prompt: Callable
-        + on_answers: Callable
+        + on_answer: Callable
         + on_extract: Callable
-        + on_blocks: Callable
         + on_execute: Callable
     }
 }
@@ -125,7 +124,7 @@ package "Models" {
 
     class PromptExchange {
         + prompt: LlmMessage
-        + answers: List
+        + answer: List
         + error: PromptError
         + code: str
     }
@@ -133,7 +132,7 @@ package "Models" {
     class ExecutionBlock {
         + generated_code: str
         + processed_code: str
-        + is_executed: bool
+        + executed: bool
         + feedback: ContextualizedFeedback
         + response: ContextualizedMessage
         + error: ExecutionError

@@ -144,14 +144,14 @@ class OtcPromptingStrategy(PromptingStrategy):
         observation = self.create_observation_from_request(cycle.request)
 
         for prompt_cycle in cycle.cycles:
-            if not prompt_cycle.exchanges or not prompt_cycle.exchanges[-1].answers:
+            if not prompt_cycle.exchanges or not prompt_cycle.exchanges[-1].answer:
                 continue
 
-            answer = prompt_cycle.exchanges[-1].answers[0]
+            answer = prompt_cycle.exchanges[-1].answer
             thinking, _ = self.extract_thinking_commands(answer.text)
 
             executed_blocks = list(filter(
-                lambda block: block.is_executed, prompt_cycle.blocks
+                lambda block: block.executed, prompt_cycle.blocks
             ))
             commands = "\n".join(
                 map(lambda block: block.generated_code, executed_blocks)

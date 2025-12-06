@@ -4,14 +4,13 @@ from typing import Any, Dict, List
 from chat2edit.context.providers.context_provider import ContextProvider
 from chat2edit.execution.decorators import respond
 from chat2edit.models import (
-    ChatCycle,
+    ExemplaryChatCycle,
     ChatMessage,
-    ContextualizedMessage,
-    ExecutionBlock,
+    ExemplaryExecutionBlock,
     Exemplar,
     LlmMessage,
-    PromptCycle,
-    PromptExchange,
+    ExemplaryPromptCycle,
+    ExemplaryPromptExchange,
 )
 
 
@@ -31,42 +30,33 @@ class CalculatorContextProvider(ContextProvider):
         return [
             Exemplar(
                 cycles=[
-                    ChatCycle(
-                        request=ContextualizedMessage(
+                    ExemplaryChatCycle(
+                        request=ChatMessage(
                             text="What is the square root of 1296?",
                         ),
                         cycles=[
-                            PromptCycle(
+                            ExemplaryPromptCycle(
                                 exchanges=[
-                                    PromptExchange(
-                                        prompt=LlmMessage(
-                                            text="",
-                                        ),
-                                        answers=[
-                                            LlmMessage(
-                                                text="""
-                                            thinking: I should use the math module to calculate the square root.
-                                            commands:
-                                            ```python
-                                            result = math.sqrt(1296)
-                                            respond_to_user(f"The square root of 1296 is {result}")
-                                            ```
+                                    ExemplaryPromptExchange(
+                                        answer=LlmMessage(
+                                            text="""
+thinking: I should use the math module to calculate the square root.
+commands:
+```python
+result = math.sqrt(1296)
+respond_to_user(f"The square root of 1296 is {result}")
+```
                                             """,
-                                            )
-                                        ],
+                                        ),
                                     )
                                 ],
                                 blocks=[
-                                    ExecutionBlock(
+                                    ExemplaryExecutionBlock(
                                         generated_code="result = math.sqrt(1296)",
-                                        processed_code="result = math.sqrt(1296)",
-                                        is_executed=True,
                                     ),
-                                    ExecutionBlock(
+                                    ExemplaryExecutionBlock(
                                         generated_code='respond_to_user(f"The square root of 1296 is {result}")',
-                                        processed_code='respond_to_user(f"The square root of 1296 is {result}")',
-                                        is_executed=True,
-                                        response=ContextualizedMessage(
+                                        response=ChatMessage(
                                             text="The square root of 1296 is 36.",
                                         ),
                                     ),
@@ -78,48 +68,37 @@ class CalculatorContextProvider(ContextProvider):
             ),
             Exemplar(
                 cycles=[
-                    ChatCycle(
-                        request=ContextualizedMessage(
+                    ExemplaryChatCycle(
+                        request=ChatMessage(
                             text="What is the cosine of 57 degrees?",
                         ),
                         cycles=[
-                            PromptCycle(
+                            ExemplaryPromptCycle(
                                 exchanges=[
-                                    PromptExchange(
-                                        prompt=LlmMessage(
-                                            text="",
-                                        ),
-                                        answers=[
-                                            LlmMessage(
-                                                text="""
-                                            thinking: I should use the math module to calculate the cosine.
-                                            commands:
-                                            ```python
-                                            radians = math.radians(57)
-                                            result = math.cos(radians)
-                                            respond_to_user(f"The cosine of 57 degrees is {result}")
-                                            ```
+                                    ExemplaryPromptExchange(
+                                        answer=LlmMessage(
+                                            text="""
+thinking: I should use the math module to calculate the cosine.
+commands:
+```python
+radians = math.radians(57)
+result = math.cos(radians)
+respond_to_user(f"The cosine of 57 degrees is {result}")
+```
                                             """
-                                            )
-                                        ],
+                                        ),
                                     ),
                                 ],
                                 blocks=[
-                                    ExecutionBlock(
+                                    ExemplaryExecutionBlock(
                                         generated_code="radians = math.radians(57)",
-                                        processed_code="radians = math.radians(57)",
-                                        is_executed=True,
                                     ),
-                                    ExecutionBlock(
+                                    ExemplaryExecutionBlock(
                                         generated_code="result = math.cos(radians)",
-                                        processed_code="result = math.cos(radians)",
-                                        is_executed=True,
                                     ),
-                                    ExecutionBlock(
+                                    ExemplaryExecutionBlock(
                                         generated_code='respond_to_user(f"The cosine of 57 degrees is {result}")',
-                                        processed_code='respond_to_user(f"The cosine of 57 degrees is {result}")',
-                                        is_executed=True,
-                                        response=ContextualizedMessage(
+                                        response=ChatMessage(
                                             text="The cosine of 57 degrees is 0.5446390350150271.",
                                         ),
                                     ),
