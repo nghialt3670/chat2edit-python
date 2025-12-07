@@ -2,7 +2,7 @@ from typing import List, Literal
 
 from pydantic import Field
 
-from chat2edit.models import Feedback
+from chat2edit.models.feedback import Feedback
 
 
 class MissingAllOptionalParametersFeedback(Feedback):
