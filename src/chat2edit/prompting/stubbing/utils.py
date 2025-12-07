@@ -95,6 +95,26 @@ def find_shortest_import_path(obj: Any) -> str:
             candidates.append(name)
 
     candidates = [c for c in candidates if not c.startswith("__")]
+    
+    # If no candidates found after filtering, fall back to the object's module
+    if not candidates:
+        obj_module = inspect.getmodule(obj)
+        if obj_module is not None:
+            module_name = obj_module.__name__
+            # Only return if it doesn't start with "__"
+            if not module_name.startswith("__"):
+                return module_name
+        # Last resort: try to get module from object's __module__ attribute
+        if hasattr(obj, "__module__") and obj.__module__:
+            module_name = obj.__module__
+            if not module_name.startswith("__"):
+                return module_name
+        # If all else fails, raise a more informative error
+        raise ValueError(
+            f"Could not find import path for {obj.__name__} (type: {type(obj).__name__}). "
+            f"Object module: {getattr(obj, '__module__', 'unknown')}"
+        )
+    
     return min(candidates, key=len)
 
 
