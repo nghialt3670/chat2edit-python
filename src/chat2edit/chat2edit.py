@@ -10,7 +10,6 @@ from chat2edit.models import (
     ChatCycle,
     ExecutionBlock,
     Exemplar,
-    Feedback,
     Message,
     PromptCycle,
     PromptExchange,
@@ -52,9 +51,10 @@ class Chat2Edit:
         self._execution_strategy = execution_strategy
         self._callbacks = callbacks
         self._config = config
-        self._exemplars = self._context_strategy.contextualize_exemplar(
-            self._context_provider.get_exemplars(), {}
-        )
+        self._exemplars = [
+            self._contextualize_exemplar(exemplar)
+            for exemplar in self._context_provider.get_exemplars()
+        ]
 
     async def generate(
         self,
@@ -83,6 +83,9 @@ class Chat2Edit:
                 break
 
             code = prompt_cycle.exchanges[-1].code
+            if not code:
+                break
+
             prompt_cycle.blocks = await self._execute(code, context)
 
             executed_blocks = list(filter(lambda block: block.executed, prompt_cycle.blocks))
@@ -98,9 +101,9 @@ class Chat2Edit:
     async def _prompt(
         self,
         cycles: List[ChatCycle],
-    ) -> PromptCycle:
+    ) -> List[PromptExchange]:
         context = self._context_provider.get_context()
-        exchanges = []
+        exchanges: List[PromptExchange] = []
 
         while len(exchanges) < self._config.max_llm_exchanges:
             prompt = (
@@ -112,14 +115,17 @@ class Chat2Edit:
             exchanges.append(exchange)
 
             if self._callbacks.on_prompt:
-                self._callbacks.on_prompt(exchange.prompt)
+                self._callbacks.on_prompt(prompt)
 
             try:
-                history = [[e.prompt, e.answer] for e in exchanges[:-1]]
-                exchange.answer = await self._llm.generate(exchange.prompt, history)
+                history: List[Tuple[Message, Message]] = [
+                    (e.prompt, e.answer) for e in exchanges[:-1] if e.answer
+                ]
+                answer = await self._llm.generate(exchange.prompt, history)
+                exchange.answer = answer
 
                 if self._callbacks.on_answer:
-                    self._callbacks.on_answer(exchange.answer)
+                    self._callbacks.on_answer(answer)
 
             except Exception as e:
                 error = PromptError.from_exception(e)
@@ -127,17 +133,17 @@ class Chat2Edit:
                 exchange.error = error
                 break
 
-            exchange.code = self._prompting_strategy.extract_code(exchange.answer.text)
+            code = self._prompting_strategy.extract_code(answer.text)
+            exchange.code = code
 
-            if exchange.code:
+            if code:
                 if self._callbacks.on_extract:
-                    self._callbacks.on_extract(exchange.code)
-
+                    self._callbacks.on_extract(code)
                 break
 
         return exchanges
 
-    async def _execute(self, code: str, context: Dict[str, Any]) -> List[str]:
+    async def _execute(self, code: str, context: Dict[str, Any]) -> List[ExecutionBlock]:
         generated_code_blocks = self._execution_strategy.parse(code)
         processed_code_blocks = [
             self._execution_strategy.process(block, context) for block in generated_code_blocks
@@ -148,25 +154,21 @@ class Chat2Edit:
         ]
 
         for block in blocks:
-            feedback, response, error, logs = await self._execution_strategy.execute(
+            error, feedback, response, logs = await self._execution_strategy.execute(
                 block.processed_code, context
             )
             block.executed = True
+            block.error = error
             block.feedback = (
-                None
-                if not feedback
-                else (
-                    self._context_strategy.contextualize_feedback(feedback, context)
-                    if isinstance(feedback, Feedback)
-                    else feedback
-                )
+                self._context_strategy.contextualize_feedback(feedback, context)
+                if feedback
+                else None
             )
             block.response = (
                 self._context_strategy.contextualize_message(response, context)
                 if response
                 else None
             )
-            block.error = error
             block.logs = logs
 
             if self._callbacks.on_execute:
@@ -215,7 +217,7 @@ class Chat2Edit:
                 chat_cycle.request.contextualized = True
             for prompt_cycle in chat_cycle.cycles:
                 for exchange in prompt_cycle.exchanges:
-                    if not exchange.answer.contextualized:
+                    if exchange.answer and not exchange.answer.contextualized:
                         exchange.answer = self._context_strategy.contextualize_message(
                             exchange.answer, context
                         )

@@ -11,7 +11,10 @@ from chat2edit.utils import anno_repr
 @exclude_this_decorator
 def feedback_ignored_return_value(func: Callable):
     def check_caller_frame() -> None:
-        caller_frame = inspect.currentframe().f_back.f_back
+        current_frame = inspect.currentframe()
+        if not current_frame or not current_frame.f_back or not current_frame.f_back.f_back:
+            return
+        caller_frame = current_frame.f_back.f_back
         instructions = list(inspect.getframeinfo(caller_frame).code_context or [])
 
         if not any(" = " in line for line in instructions):

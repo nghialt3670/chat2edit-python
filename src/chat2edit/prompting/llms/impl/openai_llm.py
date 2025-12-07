@@ -24,7 +24,9 @@ class OpenAILlm(Llm):
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._top_p = top_p
-        self.set_api_key(os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            self.set_api_key(api_key)
 
     def set_api_key(self, api_key: str) -> None:
         openai.api_key = api_key

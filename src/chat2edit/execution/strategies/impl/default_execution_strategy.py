@@ -33,15 +33,15 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         return fix_unawaited_async_calls(code, context)
 
     async def execute(self, code: str, context: Dict[str, Any]) -> Tuple[
+        Optional[ExecutionError],
         Optional[Feedback],
         Optional[Message],
-        Optional[ExecutionError],
         List[str],
     ]:
-        error = None  # TODO: Error is always None, should we remove it?
-        feedback = None
-        response = None
-        logs = []
+        error: Optional[ExecutionError] = None
+        feedback: Optional[Feedback] = None
+        response: Optional[Message] = None
+        logs: List[str] = []
 
         InteractiveShell.clear_instance()
 
@@ -68,7 +68,9 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         except ResponseException as e:
             response = e.response
         except Exception as e:
-            feedback = UnexpectedErrorFeedback(error=error)
+            execution_error = ExecutionError.from_exception(e)
+            error = execution_error
+            feedback = UnexpectedErrorFeedback(error=execution_error)
         finally:
             log_text = strip_ansi_codes(log_buffer.getvalue())
             logs = [line for line in log_text.splitlines() if line]
@@ -76,4 +78,4 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         feedback = feedback or pop_feedback()
         response = response or pop_response()
 
-        return feedback, response, error, logs
+        return error, feedback, response, logs

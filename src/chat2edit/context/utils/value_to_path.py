@@ -1,8 +1,8 @@
 from collections import deque
-from typing import Any
+from typing import Any, Optional
 
 
-def value_to_path(value: Any, root: Any) -> str:
+def value_to_path(value: Any, root: Any) -> Optional[str]:
     visited = set()
     queue = deque([(root, "root")])
 

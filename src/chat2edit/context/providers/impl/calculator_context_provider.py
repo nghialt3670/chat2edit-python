@@ -14,7 +14,7 @@ from chat2edit.models import (
 
 
 @respond
-def respond_to_user(text: str, attachments: List[Any] = []) -> None:
+def respond_to_user(text: str, attachments: List[Any] = []) -> Message:
     return Message(text=text, attachments=attachments)
 
 

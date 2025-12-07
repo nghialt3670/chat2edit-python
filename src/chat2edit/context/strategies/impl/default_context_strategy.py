@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Set
 from uuid import uuid4
 
-from chat2edit.context.attachments import Attachment
 from chat2edit.context.strategies.context_strategy import ContextStrategy
 from chat2edit.context.utils import path_to_value
 from chat2edit.models import (
@@ -19,27 +18,35 @@ class DefaultContextStrategy(ContextStrategy):
 
     def contextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
         return Message(
-            text=message.text,
-            attachments=self._assign_attachments(message.attachments, context),
+            text=self.contextualize_text(message.text, context),
+            attachments=self.contextualize_attachments(message.attachments, context),
             contextualized=True,
         )
 
     def contextualize_feedback(self, feedback: Feedback, context: Dict[str, Any]) -> Feedback:
         return Feedback(
-            text=feedback.text,
-            attachments=self._assign_attachments(feedback.attachments, context),
+            text=self.contextualize_text(feedback.text, context),
+            attachments=self.contextualize_attachments(feedback.attachments, context),
             contextualized=True,
+            severity=feedback.severity,
+            function=feedback.function,
         )
 
     def decontextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
         return Message(
-            text=message.text,
-            attachments=[path_to_value(path, context) for path in message.paths],
+            text=self.decontextualize_text(message.text, context),
+            attachments=self.decontextualize_attachments(message.attachments, context),
             contextualized=False,
         )
 
-    def _assign_attachments(
-        self, attachments: List[Attachment], context: Dict[str, Any]
+    def contextualize_text(self, text: str, context: Dict[str, Any]) -> str:
+        return text
+
+    def decontextualize_text(self, text: str, context: Dict[str, Any]) -> str:
+        return text
+
+    def contextualize_attachments(
+        self, attachments: List[Any], context: Dict[str, Any]
     ) -> List[str]:
         existing_varnames = set(context.keys())
         assigned_varnames = []
@@ -52,15 +59,16 @@ class DefaultContextStrategy(ContextStrategy):
 
         return assigned_varnames
 
-    def _get_attachment_basename(self, attachment: Attachment) -> str:
-        return (
-            attachment.__basename__
-            if attachment.__basename__
-            else to_snake_case(type(attachment).__name__).split("_").pop()
-        )
+    def decontextualize_attachments(
+        self, attachments: List[str], context: Dict[str, Any]
+    ) -> List[Any]:
+        return [path_to_value(path, context) for path in attachments]
 
-    def _find_suitable_varname(self, attachment: Attachment, existing_varnames: Set[str]) -> str:
-        basename = self._get_attachment_basename(attachment)
+    def get_attachment_basename(self, attachment: Any) -> str:
+        return to_snake_case(type(attachment).__name__).split("_").pop()
+
+    def _find_suitable_varname(self, attachment: Any, existing_varnames: Set[str]) -> str:
+        basename = self.get_attachment_basename(attachment)
 
         i = 0
 
@@ -70,5 +78,5 @@ class DefaultContextStrategy(ContextStrategy):
 
             i += 1
 
-        i = str(uuid4()).split("_").pop()
-        return f"{basename}_{i}"
+        unique_id = str(uuid4()).split("-")[0]
+        return f"{basename}_{unique_id}"

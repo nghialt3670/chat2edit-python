@@ -10,4 +10,4 @@ class ExemplaryExecutionBlock(BaseModel):
     generated_code: str
     feedback: Optional[Feedback] = Field(default=None)
     response: Optional[Message] = Field(default=None)
-    exectuted: bool = Field(default=True)  # Keep this field for backward compatibility
+    executed: bool = Field(default=True)  # Keep this field for backward compatibility

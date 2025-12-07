@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 
 from pydantic import Field
 
@@ -6,6 +6,6 @@ from chat2edit.models import Feedback
 
 
 class MismatchListParametersFeedback(Feedback):
-    severity: str = Field(default="error")
+    severity: Literal["info", "warning", "error"] = Field(default="error")
     parameters: List[str]
     lengths: List[int]

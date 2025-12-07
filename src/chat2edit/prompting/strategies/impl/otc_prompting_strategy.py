@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from chat2edit.execution.feedbacks import (
     EmptyListParametersFeedback,
@@ -14,6 +14,7 @@ from chat2edit.execution.feedbacks import (
 from chat2edit.models import (
     ChatCycle,
     Exemplar,
+    ExemplaryChatCycle,
     Feedback,
     Message,
 )
@@ -122,7 +123,7 @@ class OtcPromptingStrategy(PromptingStrategy):
     def get_refine_prompt(self) -> Message:
         return Message(text=OTC_REFINE_PROMPT)
 
-    def extract_code(self, text: str) -> str:
+    def extract_code(self, text: str) -> Optional[str]:
         try:
             _, code = self.extract_thinking_commands(text)
             return code
@@ -136,7 +137,7 @@ class OtcPromptingStrategy(PromptingStrategy):
         code_stub = CodeStub.from_context(context)
         return code_stub.generate()
 
-    def create_otc_sequence(self, cycle: ChatCycle) -> str:
+    def create_otc_sequence(self, cycle: Union[ChatCycle, ExemplaryChatCycle]) -> str:
         sequences = []
         observation = self.create_observation_from_request(cycle.request)
 
@@ -166,23 +167,23 @@ class OtcPromptingStrategy(PromptingStrategy):
         return "\n".join(sequences)
 
     def create_observation_from_request(self, request: Message) -> str:
-        if not request.paths:
+        if not request.attachments:
             return REQUEST_OBSERVATION_TEMPLATE.format(text=request.text)
 
         return REQUEST_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE.format(
-            text=request.text, attachments=f'[{", ".join(request.paths)}]'
+            text=request.text, attachments=f'[{", ".join(str(a) for a in request.attachments)}]'
         )
 
     def create_observation_from_feedback(self, feedback: Feedback) -> str:
         text = self.create_feedback_text(feedback)
 
-        if not feedback.paths:
+        if not feedback.attachments:
             return FEEDBACK_OBSERVATION_TEMPLATE.format(severity=feedback.severity, text=text)
 
         return FEEDBACK_OBSERVATION_WITH_ATTACHMENTS_TEMPLATE.format(
             severity=feedback.severity,
             text=text,
-            attachments=f'[{", ".join(feedback.paths)}]',
+            attachments=f'[{", ".join(str(a) for a in feedback.attachments)}]',
         )
 
     def create_feedback_text(self, feedback: Feedback) -> str:
@@ -251,6 +252,9 @@ class OtcPromptingStrategy(PromptingStrategy):
         ]
 
         thinking = parts[-2]
-        commands = re.search(r"```python(.*?)```", parts[-1], re.DOTALL).group(1).strip()
+        match = re.search(r"```python(.*?)```", parts[-1], re.DOTALL)
+        if not match:
+            return thinking, ""
 
+        commands = match.group(1).strip()
         return thinking, commands

@@ -1,7 +1,9 @@
-from pydantic import BaseModel
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 from chat2edit.models.message import Message
 
 
 class ExemplaryPromptExchange(BaseModel):
-    answer: Message
+    answer: Optional[Message] = Field(default=None)

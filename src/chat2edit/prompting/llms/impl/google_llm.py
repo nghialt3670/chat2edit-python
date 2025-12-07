@@ -1,8 +1,8 @@
 import os
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-import google.generativeai as genai
-from google.generativeai import GenerationConfig
+import google.generativeai as genai  # type: ignore[import-untyped, unused-ignore]
+from google.generativeai import GenerationConfig  # type: ignore[import-untyped, unused-ignore]
 
 from chat2edit.models import Message
 from chat2edit.prompting.llms.llm import Llm
@@ -51,7 +51,9 @@ class GoogleLlm(Llm):
             generation_config=self._generation_config,
             system_instruction=system_instruction,
         )
-        self.set_api_key(os.getenv("GOOGLE_API_KEY"))
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if api_key:
+            self.set_api_key(api_key)
 
     def set_api_key(self, api_key: str) -> None:
         genai.configure(api_key=api_key)
@@ -74,10 +76,10 @@ class GoogleLlm(Llm):
         }
 
     def _create_input_history(self, history: List[Tuple[Message, Message]]) -> List[Dict[str, str]]:
-        history = []
+        result = []
 
         for p, a in history:
-            history.append({"role": "user", "parts": p.text})
-            history.append({"role": "model", "parts": a.text})
+            result.append({"role": "user", "parts": p.text})
+            result.append({"role": "model", "parts": a.text})
 
-        return history
+        return result

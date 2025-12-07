@@ -8,7 +8,7 @@ def anno_repr(anno: Any) -> str:
         return "Any"
 
     if hasattr(anno, "__origin__"):
-        origin_repr = anno.__origin__.__name__.capitalize()
+        origin_repr = str(anno.__origin__.__name__).capitalize()
 
         if hasattr(anno, "__args__"):
             args_repr = ", ".join(map(anno_repr, anno.__args__))

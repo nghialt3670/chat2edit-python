@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chat2edit"
-version = "4.0.0"
+version = "4.0.1"
 authors = ["Le Tin Nghia <nghialt3670@gmail.com>"]
 description = "A small example package"
 readme = "README.md"
@@ -86,9 +86,24 @@ show_error_codes = true
 [[tool.mypy.overrides]]
 module = [
     "IPython.*",
+    "google.*",
     "google.generativeai.*",
     "openai.*",
     "astor.*",
     "yaml.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "chat2edit.prompting.stubbing.*",
+]
+# Stubbing code uses complex AST manipulation that mypy struggles with
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "chat2edit.context.attachments.attachment",
+]
+# Any wrapper class uses intentional dynamic behavior that conflicts with typing.Any
+ignore_errors = true

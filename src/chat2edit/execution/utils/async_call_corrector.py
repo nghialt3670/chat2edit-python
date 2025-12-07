@@ -1,7 +1,7 @@
 import ast
 import inspect
 import types
-from typing import Any, Dict, Set
+from typing import Any, Dict, Optional, Set
 
 import astor
 import black
@@ -11,10 +11,12 @@ class AsyncCallCorrector(ast.NodeTransformer):
     def __init__(self, context: Dict[str, Any]):
         super().__init__()
         # Set to store all discovered async function/method names
-        self.async_functions = set()
+        self.async_functions: Set[str] = set()
         self._collect_async_functions(context)
 
-    def _collect_async_functions(self, obj: Any, prefix: str = "", visited: Set[int] = None):
+    def _collect_async_functions(
+        self, obj: Any, prefix: str = "", visited: Optional[Set[int]] = None
+    ):
         """
         Recursively collect all async functions/methods from an object and its attributes
         """
