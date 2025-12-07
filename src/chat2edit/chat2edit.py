@@ -15,6 +15,7 @@ from chat2edit.models import (
     PromptCycle,
     PromptExchange,
 )
+from chat2edit.models.feedback import FeedbackUnion
 from chat2edit.models.prompt_error import PromptError
 from chat2edit.prompting.llms import GoogleLlm, Llm
 from chat2edit.prompting.strategies import OtcPromptingStrategy, PromptingStrategy
@@ -160,11 +161,15 @@ class Chat2Edit:
             )
             block.executed = True
             block.error = error
-            block.feedback = (
-                cast(Feedback, self._context_strategy.contextualize_message(feedback, context))
-                if feedback
-                else None
-            )
+            if feedback:
+                # contextualize_message mutates in place and returns the same object
+                # so the type is preserved (Feedback -> Feedback)
+                contextualized_feedback = self._context_strategy.contextualize_message(
+                    feedback, context
+                )
+                block.feedback = cast(FeedbackUnion, contextualized_feedback)
+            else:
+                block.feedback = None
             block.response = (
                 self._context_strategy.contextualize_message(response, context)
                 if response
@@ -225,10 +230,11 @@ class Chat2Edit:
                         exchange.answer.contextualized = True
                 for block in prompt_cycle.blocks:
                     if block.feedback and not block.feedback.contextualized:
-                        block.feedback = cast(
-                            Feedback,
-                            self._context_strategy.contextualize_message(block.feedback, context),
+                        # contextualize_message mutates in place and returns the same object
+                        contextualized_feedback = self._context_strategy.contextualize_message(
+                            block.feedback, context
                         )
+                        block.feedback = cast(FeedbackUnion, contextualized_feedback)
                         block.feedback.contextualized = True
                     if block.response and not block.response.contextualized:
                         block.response = self._context_strategy.contextualize_message(

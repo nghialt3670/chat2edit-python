@@ -6,5 +6,6 @@ from chat2edit.models import Feedback
 
 
 class IgnoredReturnValueFeedback(Feedback):
+    type: Literal["ignored_return_value"] = "ignored_return_value"
     severity: Literal["info", "warning", "error"] = Field(default="error")
     value_type: str
