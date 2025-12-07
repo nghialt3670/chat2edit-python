@@ -101,5 +101,18 @@ def _get_feedback_union():
 
 # Create the discriminated union type for runtime (Pydantic)
 # At runtime, this replaces the type alias with the actual discriminated union
+# Note: This is computed at module import time, but _get_feedback_union() uses
+# collect_subclasses() which will find all Feedback subclasses that have been
+# imported at the time it's called. To include custom feedback classes, ensure
+# they are imported before any module that uses FeedbackUnion.
 if not TYPE_CHECKING:
+    # Store the function to allow lazy recomputation if needed
+    _get_feedback_union_func = _get_feedback_union
+    # Create initial union - this will be recomputed if Feedback subclasses are added later
     FeedbackUnion = _get_feedback_union()  # type: ignore[assignment, misc]
+    
+    # Provide a way to refresh the union if custom feedback classes are added
+    def _refresh_feedback_union():
+        """Refresh FeedbackUnion to include newly imported Feedback subclasses."""
+        global FeedbackUnion
+        FeedbackUnion = _get_feedback_union()  # type: ignore[assignment, misc]
