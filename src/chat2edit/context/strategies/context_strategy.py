@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-from chat2edit.models import (
-    Feedback,
-    Message,
-)
+from chat2edit.models import Message
 
 
 class ContextStrategy(ABC):
@@ -14,10 +11,6 @@ class ContextStrategy(ABC):
 
     @abstractmethod
     def contextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
-        pass
-
-    @abstractmethod
-    def contextualize_feedback(self, feedback: Feedback, context: Dict[str, Any]) -> Feedback:
         pass
 
     @abstractmethod

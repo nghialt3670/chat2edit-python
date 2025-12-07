@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
 
@@ -10,6 +10,7 @@ from chat2edit.models import (
     ChatCycle,
     ExecutionBlock,
     Exemplar,
+    Feedback,
     Message,
     PromptCycle,
     PromptExchange,
@@ -160,7 +161,7 @@ class Chat2Edit:
             block.executed = True
             block.error = error
             block.feedback = (
-                self._context_strategy.contextualize_feedback(feedback, context)
+                cast(Feedback, self._context_strategy.contextualize_message(feedback, context))
                 if feedback
                 else None
             )
@@ -224,8 +225,9 @@ class Chat2Edit:
                         exchange.answer.contextualized = True
                 for block in prompt_cycle.blocks:
                     if block.feedback and not block.feedback.contextualized:
-                        block.feedback = self._context_strategy.contextualize_feedback(
-                            block.feedback, context
+                        block.feedback = cast(
+                            Feedback,
+                            self._context_strategy.contextualize_message(block.feedback, context),
                         )
                         block.feedback.contextualized = True
                     if block.response and not block.response.contextualized:
