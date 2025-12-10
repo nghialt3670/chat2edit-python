@@ -115,4 +115,4 @@ if not TYPE_CHECKING:
     def _refresh_feedback_union():
         """Refresh FeedbackUnion to include newly imported Feedback subclasses."""
         global FeedbackUnion
-        FeedbackUnion = _get_feedback_union()  # type: ignore[assignment, misc]
+    FeedbackUnion = _get_feedback_union()  # type: ignore[assignment, misc]
