@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Annotated, Literal, Optional, Union
+from typing import TYPE_CHECKING, Annotated, Dict, Literal, Optional, Type, Union
 
 from pydantic import Field
 
@@ -29,10 +29,115 @@ if TYPE_CHECKING:
     ]
 
 
+# Registry for Feedback subclasses keyed by their 'type' field value
+_FEEDBACK_REGISTRY: Dict[str, Type["Feedback"]] = {}
+
+
 class Feedback(Message):
     type: str  # Discriminator field - must be overridden by subclasses
     severity: Literal["info", "warning", "error"]
     function: Optional[str] = Field(default=None)
+
+    def __init_subclass__(cls, **kwargs):
+        """Automatically register Feedback subclasses by their 'type' field value."""
+        super().__init_subclass__(**kwargs)
+        # Try to get the type value from class annotations or model_fields
+        type_value = None
+        
+        # First, try to get from class annotations (available at definition time)
+        if hasattr(cls, "__annotations__") and "type" in cls.__annotations__:
+            annotation = cls.__annotations__["type"]
+            # Check if it's a Literal type
+            if hasattr(annotation, "__args__"):
+                args = annotation.__args__
+                if args and isinstance(args[0], str):
+                    type_value = args[0]
+        
+        # If not found in annotations, try model_fields (available after Pydantic processes the class)
+        if not type_value and hasattr(cls, "model_fields") and "type" in cls.model_fields:
+            type_field = cls.model_fields["type"]
+            if hasattr(type_field, "default") and type_field.default is not None:
+                type_value = type_field.default
+            elif hasattr(type_field, "default_factory"):
+                type_value = type_field.default_factory()
+            elif hasattr(type_field, "annotation"):
+                annotation = type_field.annotation
+                if hasattr(annotation, "__args__"):
+                    args = annotation.__args__
+                    if args and isinstance(args[0], str):
+                        type_value = args[0]
+        
+        # Also check if there's a default value set directly on the class
+        if not type_value and hasattr(cls, "type"):
+            type_attr = getattr(cls, "type", None)
+            if isinstance(type_attr, str):
+                type_value = type_attr
+        
+        if isinstance(type_value, str):
+            _FEEDBACK_REGISTRY[type_value] = cls
+
+
+def register_feedback_class(feedback_class: Type[Feedback]) -> None:
+    """Manually register a Feedback subclass. Useful for custom feedback classes."""
+    if not issubclass(feedback_class, Feedback):
+        raise ValueError(f"{feedback_class} must be a subclass of Feedback")
+    
+    type_value = None
+    
+    # Try multiple methods to get the type value
+    # 1. Check class annotations
+    if hasattr(feedback_class, "__annotations__") and "type" in feedback_class.__annotations__:
+        annotation = feedback_class.__annotations__["type"]
+        if hasattr(annotation, "__args__"):
+            args = annotation.__args__
+            if args and isinstance(args[0], str):
+                type_value = args[0]
+    
+    # 2. Check model_fields (available after Pydantic processes the class)
+    if not type_value and hasattr(feedback_class, "model_fields") and "type" in feedback_class.model_fields:
+        type_field = feedback_class.model_fields["type"]
+        if hasattr(type_field, "default") and type_field.default is not None:
+            type_value = type_field.default
+        elif hasattr(type_field, "default_factory"):
+            type_value = type_field.default_factory()
+        elif hasattr(type_field, "annotation"):
+            annotation = type_field.annotation
+            if hasattr(annotation, "__args__"):
+                args = annotation.__args__
+                if args and isinstance(args[0], str):
+                    type_value = args[0]
+    
+    # 3. Check class attribute directly
+    if not type_value and hasattr(feedback_class, "type"):
+        type_attr = getattr(feedback_class, "type", None)
+        if isinstance(type_attr, str):
+            type_value = type_attr
+    
+    # 4. Try creating a temporary instance to get the default value
+    if not type_value:
+        try:
+            # Create instance with minimal required fields to get the type default
+            temp_instance = feedback_class(
+                type="temp",  # This will be overridden by the default
+                severity="info"
+            )
+            if hasattr(temp_instance, "type"):
+                type_value = temp_instance.type
+        except Exception:
+            pass
+    
+    if isinstance(type_value, str) and type_value != "temp":
+        _FEEDBACK_REGISTRY[type_value] = feedback_class
+    else:
+        raise ValueError(
+            f"Could not determine 'type' value for {feedback_class}. "
+            f"Ensure the class has a 'type' field with a Literal annotation and default value."
+        )
+
+
+def get_feedback_class(type_value: str) -> Optional[Type[Feedback]]:
+    """Get a Feedback subclass by its type value."""
+    return _FEEDBACK_REGISTRY.get(type_value)
 
 
 # Import all feedback types for the union (at runtime to avoid circular imports)
@@ -83,6 +188,18 @@ def _get_feedback_union():
                 collect_subclasses(subclass)
 
     collect_subclasses(Feedback)
+    
+    # Ensure all feedback classes are registered in the registry
+    # This is important for parsing feedback from dict/JSON
+    for feedback_class in all_feedback_classes:
+        # Try to register if not already registered
+        # The __init_subclass__ should have registered them, but this ensures it
+        if feedback_class not in _FEEDBACK_REGISTRY.values():
+            try:
+                register_feedback_class(feedback_class)
+            except Exception:
+                # If registration fails, continue - it might already be registered
+                pass
 
     feedback_classes = list(all_feedback_classes)
 
