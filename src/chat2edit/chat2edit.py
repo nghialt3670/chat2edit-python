@@ -89,7 +89,7 @@ class Chat2Edit:
             prompt_cycle.blocks = await self._execute(code, context)
 
             executed_blocks = list(filter(lambda block: block.executed, prompt_cycle.blocks))
-            if executed_blocks and (executed_blocks[-1].response or executed_blocks[-1].error):
+            if executed_blocks and (executed_blocks[-1].response or executed_blocks[-1].error) and not executed_blocks[-1].feedback:
                 break
 
         return (
