@@ -5,7 +5,7 @@ from typing import Callable, get_type_hints
 from pydantic import ConfigDict, TypeAdapter
 
 from chat2edit.execution.exceptions import FeedbackException
-from chat2edit.execution.feedbacks import InvalidParameterTypeFeedback
+from chat2edit.models import Feedback
 from chat2edit.prompting.stubbing.decorators import exclude_this_decorator
 from chat2edit.utils import anno_repr
 
@@ -33,11 +33,15 @@ def feedback_invalid_parameter_type(func: Callable):
             try:
                 adaptor.validate_python(param_value)
             except:  # noqa: E722
-                feedback = InvalidParameterTypeFeedback(
+                feedback = Feedback(
+                    type="invalid_parameter_type",
+                    severity="error",
                     function=func.__name__,
-                    parameter=param_name,
-                    expected_type=anno_repr(param_anno),
-                    received_type=type(param_value).__name__,
+                    details={
+                        "parameter": param_name,
+                        "expected_type": anno_repr(param_anno),
+                        "received_type": type(param_value).__name__,
+                    },
                 )
                 raise FeedbackException(feedback)
 

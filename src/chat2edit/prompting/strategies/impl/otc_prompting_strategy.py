@@ -177,96 +177,57 @@ class OtcPromptingStrategy(PromptingStrategy):
         )
 
     def create_feedback_text(self, feedback: Feedback) -> str:
-        # Handle dict input (when deserialized from JSON)
+        # Handle dict input (when deserialized from JSON) - cast to Feedback
         if isinstance(feedback, dict):
-            feedback_type = feedback.get("type")
-        else:
-            feedback_type = feedback.type
+            feedback = Feedback.model_validate(feedback)
+        
+        feedback_type = feedback.type
+        details = feedback.details
 
         if feedback_type == "invalid_parameter_type":
-            if isinstance(feedback, dict):
-                return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.get("function", ""),
-                    parameter=feedback.get("parameter", ""),
-                    expected_type=feedback.get("expected_type", ""),
-                    received_type=feedback.get("received_type", ""),
-                )
             return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function,
-                parameter=feedback.parameter,
-                expected_type=feedback.expected_type,
-                received_type=feedback.received_type,
+                parameter=details.get("parameter", ""),
+                expected_type=details.get("expected_type", ""),
+                received_type=details.get("received_type", ""),
             )
 
         elif feedback_type == "modified_attachment":
-            if isinstance(feedback, dict):
-                return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(
-                    variable=feedback.get("variable", "")
-                )
-            return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(variable=feedback.variable)
+            return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(
+                variable=details.get("variable", "")
+            )
 
         elif feedback_type == "ignored_return_value":
-            if isinstance(feedback, dict):
-                return IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.get("function", ""),
-                    value_type=feedback.get("value_type", ""),
-                )
             return IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
-                function=feedback.function, value_type=feedback.value_type
+                function=feedback.function,
+                value_type=details.get("value_type", ""),
             )
 
         elif feedback_type == "unexpected_error":
-            if isinstance(feedback, dict):
-                function = feedback.get("function")
-                error = feedback.get("error", {})
-                if isinstance(error, dict):
-                    message = error.get("message", "")
-                else:
-                    message = str(error)
-                if function:
-                    return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                        function=function, message=message
-                    )
-                else:
-                    return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(message=message)
+            error = details.get("error", {})
+            message = error.get("message", "") if isinstance(error, dict) else str(error)
+            if feedback.function:
+                return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
+                    function=feedback.function, message=message
+                )
             else:
-                if feedback.function:
-                    return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                        function=feedback.function, message=feedback.error.message
-                    )
-                else:
-                    return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                        message=feedback.error.message
-                    )
+                return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(message=message)
 
         elif feedback_type == "incomplete_cycle":
             return INCOMPLETE_CYCLE_FEEDBACK_TEXT
 
         elif feedback_type == "empty_list_parameters":
-            if isinstance(feedback, dict):
-                params_str = ", ".join(feedback.get("parameters", []))
-                return EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.get("function", ""), params_str=params_str
-                )
-            params_str = ", ".join(feedback.parameters)
+            params_str = ", ".join(details.get("parameters", []))
             return EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function, params_str=params_str
             )
 
         elif feedback_type == "mismatch_list_parameters":
-            if isinstance(feedback, dict):
-                parameters = feedback.get("parameters", [])
-                lengths = feedback.get("lengths", [])
-                params_with_lengths = [
-                    f"{param} (length: {length})" for param, length in zip(parameters, lengths)
-                ]
-                params_str = ", ".join(params_with_lengths)
-                return MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.get("function", ""), params_str=params_str
-                )
+            parameters = details.get("parameters", [])
+            lengths = details.get("lengths", [])
             params_with_lengths = [
                 f"{param} (length: {length})"
-                for param, length in zip(feedback.parameters, feedback.lengths)
+                for param, length in zip(parameters, lengths)
             ]
             params_str = ", ".join(params_with_lengths)
             return MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
@@ -274,12 +235,7 @@ class OtcPromptingStrategy(PromptingStrategy):
             )
 
         elif feedback_type == "missing_all_optional_parameters":
-            if isinstance(feedback, dict):
-                params_str = ", ".join(feedback.get("parameters", []))
-                return MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.get("function", ""), params_str=params_str
-                )
-            params_str = ", ".join(feedback.parameters)
+            params_str = ", ".join(details.get("parameters", []))
             return MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function, params_str=params_str
             )

@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from IPython.core.interactiveshell import InteractiveShell
 
 from chat2edit.execution.exceptions import FeedbackException, ResponseException
-from chat2edit.execution.feedbacks import UnexpectedErrorFeedback
 from chat2edit.execution.signaling import pop_feedback, pop_response
 from chat2edit.execution.strategies.execution_strategy import ExecutionStrategy
 from chat2edit.execution.utils import fix_unawaited_async_calls
@@ -70,7 +69,13 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         except Exception as e:
             execution_error = ExecutionError.from_exception(e)
             error = execution_error
-            feedback = UnexpectedErrorFeedback(error=execution_error)
+            feedback = Feedback(
+                type="unexpected_error",
+                severity="error",
+                details={
+                    "error": execution_error.model_dump(),
+                },
+            )
         finally:
             log_text = strip_ansi_codes(log_buffer.getvalue())
             logs = [line for line in log_text.splitlines() if line]

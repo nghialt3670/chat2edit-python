@@ -3,8 +3,7 @@ from functools import wraps
 from typing import Callable
 
 from chat2edit.execution.exceptions import FeedbackException
-from chat2edit.execution.feedbacks import UnexpectedErrorFeedback
-from chat2edit.models import ExecutionError
+from chat2edit.models import ExecutionError, Feedback
 from chat2edit.prompting.stubbing.decorators import exclude_this_decorator
 
 
@@ -19,7 +18,14 @@ def feedback_unexpected_error(func: Callable):
         except Exception as e:
             error = ExecutionError.from_exception(e)
             error.function = func.__name__
-            feedback = UnexpectedErrorFeedback(error=error)
+            feedback = Feedback(
+                type="unexpected_error",
+                severity="error",
+                function=func.__name__,
+                details={
+                    "error": error.model_dump(),
+                },
+            )
             raise FeedbackException(feedback)
 
     @wraps(func)
@@ -31,7 +37,14 @@ def feedback_unexpected_error(func: Callable):
         except Exception as e:
             error = ExecutionError.from_exception(e)
             error.function = func.__name__
-            feedback = UnexpectedErrorFeedback(error=error)
+            feedback = Feedback(
+                type="unexpected_error",
+                severity="error",
+                function=func.__name__,
+                details={
+                    "error": error.model_dump(),
+                },
+            )
             raise FeedbackException(feedback)
 
     return async_wrapper if inspect.iscoroutinefunction(func) else wrapper

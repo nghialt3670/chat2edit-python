@@ -3,7 +3,7 @@ from functools import wraps
 from typing import Callable, List
 
 from chat2edit.execution.exceptions import FeedbackException
-from chat2edit.execution.feedbacks import MissingAllOptionalParametersFeedback
+from chat2edit.models import Feedback
 from chat2edit.prompting.stubbing.decorators import exclude_this_decorator_factory
 
 
@@ -24,10 +24,13 @@ def feedback_missing_all_optional_parameters(parameters: List[str]) -> Callable:
 
             # If no parameters are provided, raise feedback
             if not provided_params:
-                feedback = MissingAllOptionalParametersFeedback(
+                feedback = Feedback(
+                    type="missing_all_optional_parameters",
                     severity="error",
                     function=func.__name__,
-                    parameters=parameters,
+                    details={
+                        "parameters": parameters,
+                    },
                 )
                 raise FeedbackException(feedback)
 

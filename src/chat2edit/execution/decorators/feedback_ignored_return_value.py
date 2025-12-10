@@ -3,7 +3,7 @@ from functools import wraps
 from typing import Callable, get_type_hints
 
 from chat2edit.execution.exceptions import FeedbackException
-from chat2edit.execution.feedbacks import IgnoredReturnValueFeedback
+from chat2edit.models import Feedback
 from chat2edit.prompting.stubbing.decorators import exclude_this_decorator
 from chat2edit.utils import anno_repr
 
@@ -18,9 +18,13 @@ def feedback_ignored_return_value(func: Callable):
         instructions = list(inspect.getframeinfo(caller_frame).code_context or [])
 
         if not any(" = " in line for line in instructions):
-            feedback = IgnoredReturnValueFeedback(
+            feedback = Feedback(
+                type="ignored_return_value",
+                severity="error",
                 function=func.__name__,
-                value_type=anno_repr(get_type_hints(func).get("return")),
+                details={
+                    "value_type": anno_repr(get_type_hints(func).get("return")),
+                },
             )
             raise FeedbackException(feedback)
 

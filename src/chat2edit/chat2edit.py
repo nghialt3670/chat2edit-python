@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 
 from chat2edit.context.providers import CalculatorContextProvider, ContextProvider
 from chat2edit.context.strategies import ContextStrategy, DefaultContextStrategy
-from chat2edit.execution.feedbacks import IncompleteCycleFeedback
 from chat2edit.execution.strategies import DefaultExecutionStrategy, ExecutionStrategy
 from chat2edit.models import (
     ChatCycle,
@@ -166,7 +165,7 @@ class Chat2Edit:
                 contextualized_feedback = self._context_strategy.contextualize_message(
                     feedback, context
                 )
-                block.feedback = contextualized_feedback
+                block.feedback = cast(Feedback, contextualized_feedback)
             else:
                 block.feedback = None
             block.response = (
@@ -189,7 +188,10 @@ class Chat2Edit:
             or last_executed_block.response
             or last_executed_block.error
         ):
-            last_executed_block.feedback = IncompleteCycleFeedback()
+            last_executed_block.feedback = Feedback(
+                type="incomplete_cycle",
+                severity="info",
+            )
 
         return blocks
 
@@ -233,7 +235,7 @@ class Chat2Edit:
                         contextualized_feedback = self._context_strategy.contextualize_message(
                             block.feedback, context
                         )
-                        block.feedback = contextualized_feedback
+                        block.feedback = cast(Feedback, contextualized_feedback)
                         block.feedback.contextualized = True
                     if block.response and not block.response.contextualized:
                         block.response = self._context_strategy.contextualize_message(

@@ -3,7 +3,7 @@ from functools import wraps
 from typing import Callable, List
 
 from chat2edit.execution.exceptions import FeedbackException
-from chat2edit.execution.feedbacks import MismatchListParametersFeedback
+from chat2edit.models import Feedback
 from chat2edit.prompting.stubbing.decorators import exclude_this_decorator_factory
 
 
@@ -41,11 +41,14 @@ def feedback_mismatch_list_parameters(parameters: List[str]) -> Callable:
             # Check if all lengths are the same
             first_length = param_lengths[0]
             if not all(length == first_length for length in param_lengths):
-                feedback = MismatchListParametersFeedback(
+                feedback = Feedback(
+                    type="mismatch_list_parameters",
                     severity="error",
                     function=func.__name__,
-                    parameters=valid_params,
-                    lengths=param_lengths,
+                    details={
+                        "parameters": valid_params,
+                        "lengths": param_lengths,
+                    },
                 )
                 raise FeedbackException(feedback)
 

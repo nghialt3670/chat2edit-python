@@ -3,7 +3,7 @@ from functools import wraps
 from typing import Callable, List
 
 from chat2edit.execution.exceptions import FeedbackException
-from chat2edit.execution.feedbacks import EmptyListParametersFeedback
+from chat2edit.models import Feedback
 from chat2edit.prompting.stubbing.decorators import exclude_this_decorator_factory
 
 
@@ -34,10 +34,13 @@ def feedback_empty_list_parameters(parameters: List[str]) -> Callable:
 
             # If any parameters are empty, raise feedback
             if empty_params:
-                feedback = EmptyListParametersFeedback(
+                feedback = Feedback(
+                    type="empty_list_parameters",
                     severity="error",
                     function=func.__name__,
-                    parameters=empty_params,
+                    details={
+                        "parameters": empty_params,
+                    },
                 )
                 raise FeedbackException(feedback)
 
