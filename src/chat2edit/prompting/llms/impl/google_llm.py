@@ -67,7 +67,7 @@ class GoogleLlm(Llm):
     def get_info(self) -> Dict[str, Any]:
         return {
             "model": self._model.model_name,
-            "system_instruction": self._model.system_instruction,
+            "system_instruction": self._model._system_instruction,
             "stop_sequences": self._generation_config.stop_sequences,
             "max_out_tokens": self._generation_config.max_output_tokens,
             "temperature": self._generation_config.temperature,
