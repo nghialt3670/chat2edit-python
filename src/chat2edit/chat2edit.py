@@ -15,7 +15,6 @@ from chat2edit.models import (
     PromptCycle,
     PromptExchange,
 )
-from chat2edit.models.feedback import FeedbackUnion
 from chat2edit.models.prompt_error import PromptError
 from chat2edit.prompting.llms import GoogleLlm, Llm
 from chat2edit.prompting.strategies import OtcPromptingStrategy, PromptingStrategy
@@ -167,7 +166,7 @@ class Chat2Edit:
                 contextualized_feedback = self._context_strategy.contextualize_message(
                     feedback, context
                 )
-                block.feedback = cast(FeedbackUnion, contextualized_feedback)
+                block.feedback = contextualized_feedback
             else:
                 block.feedback = None
             block.response = (
@@ -234,7 +233,7 @@ class Chat2Edit:
                         contextualized_feedback = self._context_strategy.contextualize_message(
                             block.feedback, context
                         )
-                        block.feedback = cast(FeedbackUnion, contextualized_feedback)
+                        block.feedback = contextualized_feedback
                         block.feedback.contextualized = True
                     if block.response and not block.response.contextualized:
                         block.response = self._context_strategy.contextualize_message(

@@ -1,16 +1,6 @@
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from chat2edit.execution.feedbacks import (
-    EmptyListParametersFeedback,
-    IgnoredReturnValueFeedback,
-    IncompleteCycleFeedback,
-    InvalidParameterTypeFeedback,
-    MismatchListParametersFeedback,
-    MissingAllOptionalParametersFeedback,
-    ModifiedAttachmentFeedback,
-    UnexpectedErrorFeedback,
-)
 from chat2edit.models import (
     ChatCycle,
     Exemplar,
@@ -187,7 +177,20 @@ class OtcPromptingStrategy(PromptingStrategy):
         )
 
     def create_feedback_text(self, feedback: Feedback) -> str:
-        if isinstance(feedback, InvalidParameterTypeFeedback):
+        # Handle dict input (when deserialized from JSON)
+        if isinstance(feedback, dict):
+            feedback_type = feedback.get("type")
+        else:
+            feedback_type = feedback.type
+
+        if feedback_type == "invalid_parameter_type":
+            if isinstance(feedback, dict):
+                return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
+                    function=feedback.get("function", ""),
+                    parameter=feedback.get("parameter", ""),
+                    expected_type=feedback.get("expected_type", ""),
+                    received_type=feedback.get("received_type", ""),
+                )
             return INVALID_PARAMETER_TYPE_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function,
                 parameter=feedback.parameter,
@@ -195,34 +198,72 @@ class OtcPromptingStrategy(PromptingStrategy):
                 received_type=feedback.received_type,
             )
 
-        elif isinstance(feedback, ModifiedAttachmentFeedback):
+        elif feedback_type == "modified_attachment":
+            if isinstance(feedback, dict):
+                return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(
+                    variable=feedback.get("variable", "")
+                )
             return MODIFIED_ATTACHMENT_FEEDBACK_TEXT_TEMPLATE.format(variable=feedback.variable)
 
-        elif isinstance(feedback, IgnoredReturnValueFeedback):
+        elif feedback_type == "ignored_return_value":
+            if isinstance(feedback, dict):
+                return IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
+                    function=feedback.get("function", ""),
+                    value_type=feedback.get("value_type", ""),
+                )
             return IGNORED_RETURN_VALUE_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function, value_type=feedback.value_type
             )
 
-        elif isinstance(feedback, UnexpectedErrorFeedback):
-            if feedback.function:
-                return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                    function=feedback.function, message=feedback.error.message
-                )
+        elif feedback_type == "unexpected_error":
+            if isinstance(feedback, dict):
+                function = feedback.get("function")
+                error = feedback.get("error", {})
+                if isinstance(error, dict):
+                    message = error.get("message", "")
+                else:
+                    message = str(error)
+                if function:
+                    return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
+                        function=function, message=message
+                    )
+                else:
+                    return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(message=message)
             else:
-                return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
-                    message=feedback.error.message
-                )
+                if feedback.function:
+                    return FUNCTION_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
+                        function=feedback.function, message=feedback.error.message
+                    )
+                else:
+                    return GLOBAL_UNEXPECTED_ERROR_FEEDBACK_TEXT_TEMPLATE.format(
+                        message=feedback.error.message
+                    )
 
-        elif isinstance(feedback, IncompleteCycleFeedback):
+        elif feedback_type == "incomplete_cycle":
             return INCOMPLETE_CYCLE_FEEDBACK_TEXT
 
-        elif isinstance(feedback, EmptyListParametersFeedback):
+        elif feedback_type == "empty_list_parameters":
+            if isinstance(feedback, dict):
+                params_str = ", ".join(feedback.get("parameters", []))
+                return EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
+                    function=feedback.get("function", ""), params_str=params_str
+                )
             params_str = ", ".join(feedback.parameters)
             return EMPTY_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function, params_str=params_str
             )
 
-        elif isinstance(feedback, MismatchListParametersFeedback):
+        elif feedback_type == "mismatch_list_parameters":
+            if isinstance(feedback, dict):
+                parameters = feedback.get("parameters", [])
+                lengths = feedback.get("lengths", [])
+                params_with_lengths = [
+                    f"{param} (length: {length})" for param, length in zip(parameters, lengths)
+                ]
+                params_str = ", ".join(params_with_lengths)
+                return MISMATCH_LIST_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
+                    function=feedback.get("function", ""), params_str=params_str
+                )
             params_with_lengths = [
                 f"{param} (length: {length})"
                 for param, length in zip(feedback.parameters, feedback.lengths)
@@ -232,14 +273,19 @@ class OtcPromptingStrategy(PromptingStrategy):
                 function=feedback.function, params_str=params_str
             )
 
-        elif isinstance(feedback, MissingAllOptionalParametersFeedback):
+        elif feedback_type == "missing_all_optional_parameters":
+            if isinstance(feedback, dict):
+                params_str = ", ".join(feedback.get("parameters", []))
+                return MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
+                    function=feedback.get("function", ""), params_str=params_str
+                )
             params_str = ", ".join(feedback.parameters)
             return MISSING_ALL_OPTIONAL_PARAMETERS_FEEDBACK_TEXT_TEMPLATE.format(
                 function=feedback.function, params_str=params_str
             )
 
         else:
-            raise ValueError(f"Unknown feedback: {feedback}")
+            raise ValueError(f"Unknown feedback type: {feedback_type}")
 
     def extract_thinking_commands(self, text: str) -> Tuple[str, str]:
         parts = [
