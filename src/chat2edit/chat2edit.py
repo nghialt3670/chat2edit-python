@@ -1,3 +1,4 @@
+from time import time_ns
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel, Field
@@ -154,9 +155,22 @@ class Chat2Edit:
         ]
 
         for block in blocks:
+            block.start_time = time_ns()
+            if self._callbacks.on_execute:
+                self._callbacks.on_execute(block)
+
+            def on_log(log: str) -> None:
+                block.logs.append(log)
+
+            if self._callbacks.on_execute:
+                self._callbacks.on_execute(block)
+
             error, feedback, response, logs = await self._execution_strategy.execute(
-                block.processed_code, context
+                block.processed_code,
+                context,
+                on_log=on_log,
             )
+            block.end_time = time_ns()
             block.executed = True
             block.error = error
             if feedback:

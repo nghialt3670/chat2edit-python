@@ -3,7 +3,7 @@ import re
 import textwrap
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from IPython.core.interactiveshell import InteractiveShell
 
@@ -31,7 +31,12 @@ class DefaultExecutionStrategy(ExecutionStrategy):
     def process(self, code: str, context: Dict[str, Any]) -> str:
         return fix_unawaited_async_calls(code, context)
 
-    async def execute(self, code: str, context: Dict[str, Any]) -> Tuple[
+    async def execute(
+        self,
+        code: str,
+        context: Dict[str, Any],
+        on_log: Optional[Callable[[str], None]] = None,
+    ) -> Tuple[
         Optional[ExecutionError],
         Optional[Feedback],
         Optional[Message],
@@ -50,7 +55,30 @@ class DefaultExecutionStrategy(ExecutionStrategy):
         shell.user_ns.update(context)
         keys = set(shell.user_ns.keys())
 
-        log_buffer = StringIO()
+        class _LogStream:
+            def __init__(self, on_log_cb: Optional[Callable[[str], None]]) -> None:
+                self._buffer = StringIO()
+                self._on_log = on_log_cb
+                self._line_buffer = ""
+
+            def write(self, s: str) -> int:
+                self._buffer.write(s)
+                if self._on_log and s:
+                    text = strip_ansi_codes(s)
+                    self._line_buffer += text
+                    while "\n" in self._line_buffer:
+                        line, self._line_buffer = self._line_buffer.split("\n", 1)
+                        if line:
+                            self._on_log(line)
+                return len(s)
+
+            def flush(self) -> None:
+                self._buffer.flush()
+
+            def getvalue(self) -> str:
+                return strip_ansi_codes(self._buffer.getvalue())
+
+        log_buffer = _LogStream(on_log)
 
         try:
             with redirect_stdout(log_buffer), redirect_stderr(log_buffer):
@@ -77,7 +105,7 @@ class DefaultExecutionStrategy(ExecutionStrategy):
                 },
             )
         finally:
-            log_text = strip_ansi_codes(log_buffer.getvalue())
+            log_text = log_buffer.getvalue()
             logs = [line for line in log_text.splitlines() if line]
 
         feedback = feedback or pop_feedback()
