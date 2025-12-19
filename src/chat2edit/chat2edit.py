@@ -161,9 +161,8 @@ class Chat2Edit:
 
             def on_log(log: str) -> None:
                 block.logs.append(log)
-
-            if self._callbacks.on_execute:
-                self._callbacks.on_execute(block)
+                if self._callbacks.on_execute:
+                    self._callbacks.on_execute(block)
 
             error, feedback, response, logs = await self._execution_strategy.execute(
                 block.processed_code,
