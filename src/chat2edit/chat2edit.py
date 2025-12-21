@@ -181,11 +181,10 @@ class Chat2Edit:
                 block.feedback = cast(Feedback, contextualized_feedback)
             else:
                 block.feedback = None
-            block.response = (
-                self._context_strategy.contextualize_message(response, context)
-                if response
-                else None
-            )
+            if response:
+                block.response = self._context_strategy.contextualize_message(response, context)
+            else:
+                block.response = None
             block.logs = logs
 
             if self._callbacks.on_execute:

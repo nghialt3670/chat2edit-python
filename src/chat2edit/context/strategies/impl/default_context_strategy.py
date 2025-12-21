@@ -10,10 +10,13 @@ class DefaultContextStrategy(ContextStrategy):
         return context
 
     def contextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
-        message.text = self.contextualize_message_text(message.text, context)
-        message.attachments = self.contextualize_message_attachments(message.attachments, context)
-        message.contextualized = True
-        return message
+        contextualized_attachments = self.contextualize_message_attachments(message.attachments, context)
+        return Message(
+            timestamp=message.timestamp,
+            text=self.contextualize_message_text(message.text, context),
+            attachments=contextualized_attachments,
+            contextualized=True,
+        )
 
     def decontextualize_message(self, message: Message, context: Dict[str, Any]) -> Message:
         return Message(
