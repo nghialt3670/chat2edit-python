@@ -86,7 +86,11 @@ class DefaultExecutionStrategy(ExecutionStrategy):
 
         finally:
             new_keys = set(shell.user_ns.keys()).difference(keys)
-            context.update({k: v for k, v in shell.user_ns.items() if k in new_keys})
+            # Update context for any newly created variables AND for existing variables
+            # that were reassigned by the executed code. This ensures explicit user
+            # assignments (e.g., image_1 = ...) override previous values in context.
+            changed_keys = {k for k in shell.user_ns.keys() if k in new_keys or k in context}
+            context.update({k: v for k, v in shell.user_ns.items() if k in changed_keys})
 
         try:
             result.raise_error()
