@@ -18,15 +18,24 @@ Analyze the following context code:
 {context_code}
 ```
 
+Execution model (IMPORTANT):
+- All commands blocks are executed sequentially in a single persistent Python runtime.
+- Variables, imports, and side effects created in earlier commands remain available in later phases.
+- Treat this exactly like a Jupyter notebook kernel.
+- Assume all previous commands have already been executed successfully.
+- Do NOT reinitialize state unless explicitly instructed.
+
+Variable persistence rules:
+- Variables defined in any previous commands block are available and valid.
+- Do NOT redefine variables unless modification is explicitly required.
+- You may reference and transform existing variables.
+- Do NOT defensively recreate objects, reload data, or re-import modules.
+
 Refer to these exemplary observation-thinking-commands sequences:
 
 {exemplary_otc_sequences}
 
-Now, provide the next thinking and commands for the given sequences.  
-Guidelines:  
-- Only use the provided context code. 
-- Avoid using indentation (e.g., no if, while, with, try, catch, etc.).  
-- Do not reuse variable names. 
+Now, provide the next thinking and commands for the given sequences:
 
 {current_otc_sequences}
 """.strip()
